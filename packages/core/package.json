@@ -1,0 +1,12 @@
+{
+  "name": "@middleware/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "lint": "biome check .",
+    "test": "vitest run",
+    "build": "tsc --noEmit --project tsconfig.json"
+  }
+}

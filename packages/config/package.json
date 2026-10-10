@@ -1,0 +1,14 @@
+{
+  "name": "@middleware/config",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "tsconfig.base.json"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "lint": "biome check .",
+    "test": "vitest run --passWithNoTests",
+    "build": "tsc --noEmit --project tsconfig.json"
+  }
+}
