@@ -6,7 +6,7 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
-    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "typecheck": "next typegen && tsc --noEmit --project tsconfig.json",
     "lint": "biome check .",
     "test": "vitest run --passWithNoTests"
   },
