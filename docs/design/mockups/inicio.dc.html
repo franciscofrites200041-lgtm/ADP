@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Inicio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8F1EC}
+a{color:#B8360A}a:hover{color:#8F2905}
+input::placeholder{color:#7A6C62}
+</style>
+</helmet>
+<div style="min-height: 860px; box-sizing: border-box; padding: 28px; background: #F8F1EC; color: #221B17; font-family: 'Geist', sans-serif; font-size: 15px; line-height: 1.5">
+<div style="max-width: 1220px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px">
+
+<header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px 6px">
+<div style="display: flex; align-items: center; gap: 12px">
+<span style="width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(160deg, #FF7A45 0%, #F04A12 60%, #D93D0B 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 4px 10px rgba(217,61,11,0.25); display: grid; place-items: center; color: #FFFFFF; font-weight: 700; font-size: 13px">mw</span>
+<h1 style="margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -0.02em">Hola, Luca</h1>
+</div>
+<nav aria-label="Secciones" style="display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 18px; background: #EFE5DC">
+<a href="#inicio" style="padding: 8px 14px; border-radius: 14px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.08); color: #221B17; text-decoration: none; font-weight: 600">Inicio</a>
+<a href="#agentes" style="padding: 8px 14px; border-radius: 14px; color: #54473F; text-decoration: none">Agentes</a>
+<a href="#proveedores" style="padding: 8px 14px; border-radius: 14px; color: #54473F; text-decoration: none">Proveedores</a>
+<a href="#tareas" style="padding: 8px 14px; border-radius: 14px; color: #54473F; text-decoration: none">Tareas</a>
+<a href="#uso" style="padding: 8px 14px; border-radius: 14px; color: #54473F; text-decoration: none">Uso</a>
+</nav>
+</header>
+
+<div style="display: flex; flex-wrap: wrap; gap: 16px">
+<section aria-label="Presentación" style="flex: 2 1 520px; min-height: 260px; box-sizing: border-box; border-radius: 28px; padding: 32px; display: flex; flex-direction: column; justify-content: flex-end; background: radial-gradient(90% 120% at 15% 10%, #F3E9E1 0%, #C9B9AD 38%, #6B5A50 72%, #2E2521 100%); color: #F8F1EC">
+<p style="margin: 0; font-size: 40px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.15">/tus keys<br>/tus agentes</p>
+<p style="margin: 10px 0 0; font-size: 15px; color: #EADFD6">Un lugar para todos tus modelos y lo que hacen por vos.</p>
+</section>
+
+<section aria-label="Crear" style="flex: 1 1 280px; box-sizing: border-box; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 10px; justify-content: center; background: radial-gradient(120% 120% at 100% 100%, #A99A90 0%, #5C4D45 45%, #2E2521 100%)">
+<a href="#nuevo-agente" style="display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; min-height: 44px; border-radius: 16px; background: #2B231F; box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 0 1px rgba(255,255,255,0.06); color: #F8F1EC; text-decoration: none; font-weight: 500"><span style="width: 34px; height: 34px; border-radius: 10px; background: #3B312C; display: grid; place-items: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="3.5" y="5.5" width="11" height="9" rx="2.5" fill="none" stroke="#F8F1EC" stroke-width="1.5"></rect><path d="M9 2.5v3M7 10h.01M11 10h.01" stroke="#F8F1EC" stroke-width="1.8" stroke-linecap="round"></path></svg></span>Nuevo agente</a>
+<a href="#nueva-tarea" style="display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; min-height: 44px; border-radius: 16px; background: #2B231F; box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 0 1px rgba(255,255,255,0.06); color: #F8F1EC; text-decoration: none; font-weight: 500"><span style="width: 34px; height: 34px; border-radius: 10px; background: #3B312C; display: grid; place-items: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="6" fill="none" stroke="#F8F1EC" stroke-width="1.5"></circle><path d="M9 5.5V9l2.5 1.5" fill="none" stroke="#F8F1EC" stroke-width="1.5" stroke-linecap="round"></path></svg></span>Nueva tarea programada</a>
+<a href="#nueva-conexion" style="display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; min-height: 44px; border-radius: 16px; background: #2B231F; box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 0 1px rgba(255,255,255,0.06); color: #F8F1EC; text-decoration: none; font-weight: 500"><span style="width: 34px; height: 34px; border-radius: 10px; background: #3B312C; display: grid; place-items: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M7.5 10.5 10.5 7.5M6 8 4.5 9.5a2.5 2.5 0 0 0 3.5 3.5L9.5 11.5M12 10l1.5-1.5A2.5 2.5 0 0 0 10 5L8.5 6.5" fill="none" stroke="#F8F1EC" stroke-width="1.5" stroke-linecap="round"></path></svg></span>Nueva conexión</a>
+<button type="button" aria-label="Cerrar menú" style="align-self: center; margin-top: 6px; width: 48px; height: 48px; border-radius: 16px; border: 0; background: linear-gradient(160deg, #FF7A45 0%, #F04A12 60%, #D93D0B 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 6px 14px rgba(217,61,11,0.35); display: grid; place-items: center; cursor: pointer"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path></svg></button>
+</section>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 16px">
+<section aria-labelledby="prov-title" style="flex: 1 1 380px; box-sizing: border-box; border-radius: 28px; padding: 18px; background: #EFE5DC; display: flex; flex-direction: column; gap: 8px">
+<h2 id="prov-title" style="margin: 0 4px 6px; font-size: 15px; font-weight: 600">Tus proveedores</h2>
+<sc-for list="{{providers}}" as="p" hint-placeholder-count="5">
+<div style="display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 8px; border-radius: 18px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.08)">
+<span style="width: 34px; height: 34px; border-radius: 50%; background: #EFE5DC; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #54473F">{{p.initial}}</span>
+<div style="flex: 1; min-width: 0; line-height: 1.2"><div style="font-weight: 500">{{p.name}}</div><div style="font-size: 12px; color: #6E6259">{{p.alias}}</div></div>
+<span style="font-family: 'Geist Mono', monospace; font-size: 12px; padding: 4px 8px; border-radius: 8px; background: #F3EAE2; color: #54473F">{{p.masked}}</span>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #54473F; min-width: 74px"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{p.dot}}"></span>{{p.status}}</span>
+</div>
+</sc-for>
+</section>
+
+<section aria-labelledby="flow-title" style="flex: 1 1 360px; box-sizing: border-box; border-radius: 28px; padding: 18px; background: #EFE5DC; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0 4px"><h2 id="flow-title" style="margin: 0; font-size: 15px; font-weight: 600">Resumen diario</h2><span style="font-size: 13px; color: #6E6259">Todos los días, 9:00</span></div>
+<div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 0">
+<div style="display: flex; align-items: center; gap: 0">
+<div style="padding: 10px 12px; border-radius: 16px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.08); line-height: 1.2"><div style="font-size: 13px; font-weight: 600">Búsqueda web</div><div style="font-size: 12px; color: #6E6259">20 fuentes</div></div>
+<span style="width: 28px; border-top: 2px dashed #F2A07E"></span>
+<div style="padding: 10px 12px; border-radius: 16px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.08); line-height: 1.2"><div style="font-size: 13px; font-weight: 600">Investigador</div><div style="font-size: 12px; color: #6E6259">Resume y cita</div></div>
+</div>
+<span style="height: 26px; border-left: 2px dashed #F2A07E"></span>
+<div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 10px; border-radius: 16px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.08); line-height: 1.2"><span style="width: 10px; height: 10px; border-radius: 50%; background: #D93D0B"></span><div><div style="font-size: 13px; font-weight: 600">Enviar a Slack</div><div style="font-size: 12px; color: #6E6259">Pide aprobación</div></div></div>
+</div>
+</section>
+
+<section aria-labelledby="uso-title" style="flex: 1 1 240px; box-sizing: border-box; border-radius: 28px; padding: 18px 20px; background: #EFE5DC; display: flex; flex-direction: column; gap: 6px">
+<h2 id="uso-title" style="margin: 0; font-size: 15px; font-weight: 600">Uso del mes</h2>
+<div style="font-size: 34px; font-weight: 500; letter-spacing: -0.03em; margin-top: 8px">US$ 3,18</div>
+<div style="font-size: 13px; color: #6E6259">en 214 ejecuciones</div>
+<div aria-hidden="true" style="margin-top: auto; display: flex; align-items: flex-end; gap: 6px; height: 72px; padding-top: 12px">
+<sc-for list="{{bars}}" as="b" hint-placeholder-count="10"><span style="flex: 1; border-radius: 6px; background: {{b.color}}; height: {{b.h}}"></span></sc-for>
+</div>
+</section>
+</div>
+
+<form style="border-radius: 28px; padding: 18px; background: #EFE5DC; display: flex; align-items: center; gap: 10px; max-width: 640px; box-sizing: border-box">
+<label for="ask-home" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Preguntale a un agente</label>
+<input id="ask-home" type="text" placeholder="Preguntale a un agente…" style="flex: 1; min-width: 0; border: 0; outline: none; border-radius: 20px; padding: 15px 18px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 3px rgba(60,40,30,0.1); color: #221B17; font: inherit">
+<button type="button" aria-label="Dictar" style="width: 52px; height: 52px; border-radius: 18px; border: 0; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 3px rgba(60,40,30,0.1); display: grid; place-items: center; cursor: pointer"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2.5" width="6" height="10" rx="3" fill="none" stroke="#221B17" stroke-width="1.6"></rect><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5" fill="none" stroke="#221B17" stroke-width="1.6" stroke-linecap="round"></path></svg></button>
+</form>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":860}}'>
+class Component extends DCLogic {
+renderVals() {
+const ok = '#3F8F5A', pending = '#C9A227';
+const heights = [30, 45, 25, 60, 50, 70, 40, 85, 55, 95];
+return {
+providers: [
+{ initial: 'A', name: 'Anthropic', alias: 'Personal', masked: '····4f2a', status: 'Válida', dot: ok },
+{ initial: 'O', name: 'OpenAI', alias: 'Trabajo', masked: '····9c1e', status: 'Válida', dot: ok },
+{ initial: 'X', name: 'xAI', alias: 'Grok', masked: '····7b30', status: 'Válida', dot: ok },
+{ initial: 'R', name: 'OpenRouter', alias: 'Pruebas', masked: '····a5d2', status: 'Sin probar', dot: pending },
+{ initial: 'B', name: 'Brave Search', alias: 'Herramienta', masked: '····e81f', status: 'Válida', dot: ok }
+],
+bars: heights.map((h, i) => ({ h: h + '%', color: i === heights.length - 1 ? '#D93D0B' : '#D9C8BC' }))
+};
+}
+}
+</script>
+</body>
+</html>
