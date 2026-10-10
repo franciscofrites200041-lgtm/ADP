@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Nuevo agente</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8F1EC}
+a{color:#B8360A}a:hover{color:#8F2905}
+input::placeholder,textarea::placeholder{color:#7A6C62}
+input[type=range]{accent-color:#D93D0B}
+</style>
+</helmet>
+<div style="min-height: 1180px; box-sizing: border-box; padding: 24px 28px 40px; background: #F8F1EC; color: #221B17; font-family: 'Geist', sans-serif; font-size: 15px; line-height: 1.5">
+<div style="max-width: 1220px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px">
+
+<header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px">
+<div style="display: flex; align-items: center; gap: 14px">
+<a href="#agentes" aria-label="Volver a Agentes" style="width: 44px; height: 44px; border-radius: 14px; background: #EFE5DC; display: grid; place-items: center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M11 4 6 9l5 5" fill="none" stroke="#221B17" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+<div style="line-height: 1.2">
+<div style="font-size: 13px; color: #6E6259">Agentes</div>
+<h1 style="margin: 0; font-size: 26px; font-weight: 500; letter-spacing: -0.03em">Nuevo agente</h1>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<button type="button" style="min-height: 44px; padding: 0 18px; border-radius: 16px; border: 0; background: #EFE5DC; color: #221B17; font: inherit; font-weight: 500; cursor: pointer">Guardar borrador</button>
+<button type="button" style="min-height: 44px; padding: 0 20px; border-radius: 16px; border: 0; background: linear-gradient(160deg, #F0581E 0%, #D93D0B 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 6px 14px rgba(217,61,11,0.28); color: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer">Crear agente</button>
+</div>
+</header>
+
+<div style="display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start">
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+<section aria-labelledby="s-id" style="border-radius: 28px; padding: 22px; background: #EFE5DC; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: baseline; gap: 10px"><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #B8360A">/01</span><h2 id="s-id" style="margin: 0; font-size: 17px; font-weight: 600">Identidad</h2></div>
+<div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 13px; font-weight: 500; color: #54473F">Ícono</span>
+<button type="button" aria-label="Cambiar ícono" style="width: 64px; height: 64px; border-radius: 20px; border: 0; background: linear-gradient(160deg, #6B5A50, #2E2521); box-shadow: inset 0 1px 0 rgba(255,255,255,0.15); display: grid; place-items: center; cursor: pointer"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="9" fill="none" stroke="#F8F1EC" stroke-width="1.8"></circle><path d="M4 13h18M13 4c2.6 2.6 3.9 5.8 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.8-3.9-9S10.4 6.6 13 4z" fill="none" stroke="#F8F1EC" stroke-width="1.8"></path></svg></button>
+</div>
+<div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 6px">
+<label for="ag-name" style="font-size: 13px; font-weight: 500; color: #54473F">Nombre</label>
+<input id="ag-name" type="text" value="{{name}}" onChange="{{setName}}" style="min-height: 48px; box-sizing: border-box; border: 0; outline: none; border-radius: 16px; padding: 0 16px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.1); color: #221B17; font: inherit">
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="ag-desc" style="font-size: 13px; font-weight: 500; color: #54473F">Descripción <span style="font-weight: 400; color: #6E6259">(opcional, la ves solo vos)</span></label>
+<input id="ag-desc" type="text" value="{{desc}}" onChange="{{setDesc}}" style="min-height: 48px; box-sizing: border-box; border: 0; outline: none; border-radius: 16px; padding: 0 16px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.1); color: #221B17; font: inherit">
+</div>
+</section>
+
+<section aria-labelledby="s-ins" style="border-radius: 28px; padding: 22px; background: #EFE5DC; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px">
+<div style="display: flex; align-items: baseline; gap: 10px"><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #B8360A">/02</span><h2 id="s-ins" style="margin: 0; font-size: 17px; font-weight: 600">Instrucciones</h2></div>
+<button type="button" style="min-height: 36px; padding: 0 14px; border-radius: 12px; border: 0; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.08); color: #221B17; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer">Empezar desde una plantilla</button>
+</div>
+<label for="ag-ins" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Instrucciones del agente</label>
+<textarea id="ag-ins" rows="7" value="{{ins}}" onChange="{{setIns}}" style="box-sizing: border-box; width: 100%; resize: vertical; border: 0; outline: none; border-radius: 18px; padding: 16px 18px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.1); color: #221B17; font: inherit; line-height: 1.6"></textarea>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 13px; color: #6E6259"><span>Escribí qué hace, cómo habla y qué no debe hacer.</span><span style="font-family: 'Geist Mono', monospace">{{insCount}}</span></div>
+</section>
+
+<section aria-labelledby="s-mod" style="border-radius: 28px; padding: 22px; background: #EFE5DC; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: baseline; gap: 10px"><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #B8360A">/03</span><h2 id="s-mod" style="margin: 0; font-size: 17px; font-weight: 600">Modelo</h2></div>
+<div role="radiogroup" aria-label="Proveedor" style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{providers}}" as="p" hint-placeholder-count="5">
+<button type="button" role="radio" aria-checked="{{p.aria}}" onClick="{{p.pick}}" style="{{p.style}}"><span style="width: 28px; height: 28px; border-radius: 50%; background: #EFE5DC; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #54473F">{{p.initial}}</span>{{p.name}}</button>
+</sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 12px">
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px">
+<label for="ag-key" style="font-size: 13px; font-weight: 500; color: #54473F">Key</label>
+<select id="ag-key" style="min-height: 48px; border: 0; outline: none; border-radius: 16px; padding: 0 14px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.1); color: #221B17; font: inherit"><option>{{keyLabel}}</option></select>
+</div>
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px">
+<label for="ag-model" style="font-size: 13px; font-weight: 500; color: #54473F">Modelo</label>
+<select id="ag-model" style="min-height: 48px; border: 0; outline: none; border-radius: 16px; padding: 0 14px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.1); color: #221B17; font-family: 'Geist Mono', monospace; font-size: 14px">
+<sc-for list="{{models}}" as="m" hint-placeholder-count="2"><option>{{m}}</option></sc-for>
+</select>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 12px">
+<div style="flex: 1 1 240px; border-radius: 18px; padding: 14px 16px; background: #F6EEE7; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between"><label for="ag-temp" style="font-size: 13px; font-weight: 500; color: #54473F">Creatividad</label><span style="font-family: 'Geist Mono', monospace; font-size: 13px">{{temp}}</span></div>
+<input id="ag-temp" type="range" min="0" max="1" step="0.1" value="{{temp}}" onChange="{{setTemp}}" style="width: 100%">
+<div style="display: flex; justify-content: space-between; font-size: 12px; color: #6E6259"><span>Precisa</span><span>Creativa</span></div>
+</div>
+<div style="flex: 1 1 240px; border-radius: 18px; padding: 14px 16px; background: #F6EEE7; display: flex; flex-direction: column; gap: 8px">
+<span id="lbl-think" style="font-size: 13px; font-weight: 500; color: #54473F">Razonamiento</span>
+<div role="radiogroup" aria-labelledby="lbl-think" style="display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #EFE5DC">
+<sc-for list="{{levels}}" as="l" hint-placeholder-count="3">
+<button type="button" role="radio" aria-checked="{{l.aria}}" onClick="{{l.pick}}" style="{{l.style}}">{{l.label}}</button>
+</sc-for>
+</div>
+</div>
+</div>
+</section>
+
+<section aria-labelledby="s-tools" style="border-radius: 28px; padding: 22px; background: #EFE5DC; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px">
+<div style="display: flex; align-items: baseline; gap: 10px"><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #B8360A">/04</span><h2 id="s-tools" style="margin: 0; font-size: 17px; font-weight: 600">Herramientas</h2></div>
+<a href="#conexiones" style="font-size: 13px; font-weight: 500">Administrar conexiones</a>
+</div>
+<sc-for list="{{tools}}" as="t" hint-placeholder-count="4">
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 10px; border-radius: 18px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.08)">
+<span style="width: 38px; height: 38px; border-radius: 12px; background: #EFE5DC; display: grid; place-items: center; font-family: 'Geist Mono', monospace; font-size: 13px; font-weight: 500; color: #54473F">{{t.glyph}}</span>
+<div style="flex: 1; min-width: 0; line-height: 1.25">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px"><span style="font-weight: 600">{{t.name}}</span><sc-if value="{{t.approval}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #FBE3D6; color: #8F2905">Pide aprobación</span></sc-if></div>
+<div style="font-size: 13px; color: #6E6259">{{t.sub}}</div>
+</div>
+<button type="button" role="switch" aria-checked="{{t.aria}}" aria-label="{{t.toggleLabel}}" onClick="{{t.toggle}}" style="{{t.trackStyle}}"><span style="{{t.knobStyle}}"></span></button>
+</div>
+</sc-for>
+</section>
+</div>
+
+<aside aria-label="Vista previa" style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<section aria-labelledby="s-flow" style="border-radius: 28px; padding: 20px; background: #EFE5DC; display: flex; flex-direction: column; align-items: center; gap: 0">
+<h2 id="s-flow" style="align-self: flex-start; margin: 0 0 14px; font-size: 15px; font-weight: 600">Así queda conectado</h2>
+<div style="display: flex; align-items: center; gap: 10px; padding: 8px 16px 8px 8px; border-radius: 18px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.1)">
+<span style="width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(160deg, #6B5A50, #2E2521); display: grid; place-items: center"><svg width="16" height="16" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="9" fill="none" stroke="#F8F1EC" stroke-width="2.4"></circle><path d="M4 13h18" stroke="#F8F1EC" stroke-width="2.4"></path></svg></span>
+<div style="line-height: 1.2"><div style="font-size: 14px; font-weight: 600">{{name}}</div><div style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #6E6259">{{modelShort}}</div></div>
+</div>
+<span style="height: 22px; border-left: 2px dashed #F2A07E"></span>
+<div style="width: 86%; height: 0; border-top: 2px dashed #F2A07E"></div>
+<div style="width: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding-top: 0">
+<sc-for list="{{activeTools}}" as="a" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column; align-items: center"><span style="height: 18px; border-left: 2px dashed #F2A07E"></span><span style="padding: 7px 12px; border-radius: 14px; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.08); font-size: 12.5px; font-weight: 500">{{a}}</span></div>
+</sc-for>
+</div>
+<sc-if value="{{noTools}}" hint-placeholder-val="{{false}}"><p style="margin: 14px 0 0; font-size: 13px; color: #6E6259">Sin herramientas: solo conversa.</p></sc-if>
+</section>
+
+<section aria-labelledby="s-try" style="border-radius: 28px; padding: 20px; background: radial-gradient(120% 120% at 100% 0%, #A99A90 0%, #5C4D45 42%, #2B231F 100%); color: #F8F1EC; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 28px rgba(43,35,31,0.22)">
+<div style="display: flex; justify-content: space-between; align-items: center"><h2 id="s-try" style="margin: 0; font-size: 15px; font-weight: 600">Probalo antes de crearlo</h2><span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #D9CCC2">US$ 0,00</span></div>
+<div style="align-self: flex-end; max-width: 85%; padding: 10px 14px; border-radius: 18px 18px 6px 18px; background: rgba(248,241,236,0.14); font-size: 14px">¿Qué pasó esta semana con MCP?</div>
+<div style="align-self: flex-start; max-width: 90%; padding: 10px 14px; border-radius: 18px 18px 18px 6px; background: #F8F1EC; color: #221B17; font-size: 14px">Busco en la web y te cuento lo más importante en tres puntos, con las fuentes.</div>
+<form style="display: flex; gap: 8px; margin-top: 4px">
+<label for="try-msg" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Mensaje de prueba</label>
+<input id="try-msg" type="text" placeholder="Probá un mensaje…" style="flex: 1; min-width: 0; min-height: 46px; box-sizing: border-box; border: 0; outline: none; border-radius: 16px; padding: 0 14px; background: rgba(248,241,236,0.12); box-shadow: inset 0 0 0 1px rgba(248,241,236,0.18); color: #F8F1EC; font: inherit; font-size: 14px">
+<button type="button" aria-label="Enviar prueba" style="width: 46px; height: 46px; border-radius: 16px; border: 0; background: linear-gradient(160deg, #FF7A45 0%, #F04A12 60%, #D93D0B 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.45); display: grid; place-items: center; cursor: pointer"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4M5 9l5-5 5 5" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+</form>
+<p style="margin: 0; font-size: 12px; color: #D9CCC2">Las pruebas usan tu key y cuentan en el uso del mes.</p>
+</section>
+</aside>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1180}}'>
+class Component extends DCLogic {
+constructor(props) {
+super(props);
+this.state = {
+name: 'Investigador web',
+desc: 'Busca novedades y arma resúmenes cortos con fuentes.',
+ins: 'Sos un investigador que busca información actual en la web.\n\nCuando te pidan un tema:\n1. Buscá en al menos 5 fuentes confiables.\n2. Respondé en español, en tres puntos como máximo.\n3. Citá cada fuente con un número.\n\nNunca publiques nada sin que te lo pidan.',
+provider: 'anthropic',
+temp: '0.4',
+level: 'medio',
+tools: { web: true, http: true, mcp: false, code: false }
+};
+}
+renderVals() {
+const s = this.state;
+const catalog = [
+{ id: 'anthropic', name: 'Anthropic', initial: 'A', key: 'Personal ····4f2a', models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5'] },
+{ id: 'openai', name: 'OpenAI', initial: 'O', key: 'Trabajo ····9c1e', models: ['gpt-6-sol', 'gpt-6-luna'] },
+{ id: 'xai', name: 'xAI', initial: 'X', key: 'Grok ····7b30', models: ['grok-5', 'grok-5-mini'] },
+{ id: 'google', name: 'Google', initial: 'G', key: 'Sin keys: cargá una', models: ['gemini-3-pro', 'gemini-3-flash'] },
+{ id: 'openrouter', name: 'OpenRouter', initial: 'R', key: 'Pruebas ····a5d2', models: ['openrouter/auto'] }
+];
+const cur = catalog.find((c) => c.id === s.provider) || catalog[0];
+const pill = (on) => 'display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 14px 6px 6px; border-radius: 16px; font: inherit; font-weight: 500; cursor: pointer; color: #221B17; ' + (on ? 'border: 2px solid #D93D0B; background: #FBF7F3; box-shadow: inset 0 1px 0 #FFFFFF, 0 2px 6px rgba(217,61,11,0.15)' : 'border: 2px solid transparent; background: #F6EEE7');
+const seg = (on) => 'flex: 1; min-height: 38px; border: 0; border-radius: 11px; font: inherit; font-size: 14px; cursor: pointer; ' + (on ? 'background: #FBF7F3; color: #221B17; font-weight: 600; box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(60,40,30,0.12)' : 'background: transparent; color: #54473F; font-weight: 500');
+const toolDefs = [
+{ id: 'web', name: 'Búsqueda web', sub: 'Brave Search, key ····e81f', glyph: '/w', short: 'Búsqueda web', approval: false },
+{ id: 'http', name: 'Llamadas HTTP', sub: 'Webhook de Slack #producto', glyph: '/h', short: 'Slack', approval: true },
+{ id: 'mcp', name: 'Servidor MCP', sub: 'Notion, solo lectura', glyph: '/m', short: 'Notion', approval: false },
+{ id: 'code', name: 'Ejecutar código', sub: 'Sandbox aislado, 30 s máximo', glyph: '/c', short: 'Código', approval: false }
+];
+const tools = toolDefs.map((t) => {
+const on = !!s.tools[t.id];
+return Object.assign({}, t, {
+aria: on ? 'true' : 'false',
+toggleLabel: (on ? 'Desactivar ' : 'Activar ') + t.name,
+toggle: () => this.setState({ tools: Object.assign({}, this.state.tools, { [t.id]: !on }) }),
+trackStyle: 'flex: none; width: 52px; height: 30px; border-radius: 15px; border: 0; padding: 3px; cursor: pointer; display: flex; ' + (on ? 'justify-content: flex-end; background: #D93D0B' : 'justify-content: flex-start; background: #D9CBBF'),
+knobStyle: 'width: 24px; height: 24px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 3px rgba(43,35,31,0.3)'
+});
+});
+const activeTools = toolDefs.filter((t) => s.tools[t.id]).map((t) => t.short);
+const words = s.ins.trim() ? s.ins.trim().split(/\s+/).length : 0;
+return {
+name: s.name,
+desc: s.desc,
+ins: s.ins,
+insCount: words + ' palabras',
+setName: (e) => this.setState({ name: e.target.value }),
+setDesc: (e) => this.setState({ desc: e.target.value }),
+setIns: (e) => this.setState({ ins: e.target.value }),
+providers: catalog.map((c) => ({ name: c.name, initial: c.initial, aria: c.id === s.provider ? 'true' : 'false', style: pill(c.id === s.provider), pick: () => this.setState({ provider: c.id }) })),
+keyLabel: cur.key,
+models: cur.models,
+modelShort: cur.models[0],
+temp: s.temp,
+setTemp: (e) => this.setState({ temp: e.target.value }),
+levels: [['bajo', 'Bajo'], ['medio', 'Medio'], ['alto', 'Alto']].map(([id, label]) => ({ label: label, aria: id === s.level ? 'true' : 'false', style: seg(id === s.level), pick: () => this.setState({ level: id }) })),
+tools: tools,
+activeTools: activeTools,
+noTools: activeTools.length === 0
+};
+}
+}
+</script>
+</body>
+</html>
