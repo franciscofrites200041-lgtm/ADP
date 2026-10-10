@@ -11,6 +11,9 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "build": "turbo run build",
+    "dev": "turbo run dev",
+    "infra:up": "docker compose -f infra/compose.dev.yaml up -d",
+    "infra:down": "docker compose -f infra/compose.dev.yaml down",
     "check": "pnpm typecheck && pnpm lint && pnpm test"
   },
   "devDependencies": {

@@ -1,0 +1,38 @@
+# Local development topology: PostgreSQL 18 and Caddy 2.
+#
+# The web (port 3000), API (port 3001) and worker shells run on the host via
+# `pnpm dev`; this Compose file only provides the data and reverse-proxy
+# services those shells need. It is not an implicit runtime dependency of the
+# app shells: start it with `pnpm infra:up` and stop it with `pnpm infra:down`.
+services:
+  postgres:
+    image: postgres:18
+    # Local-only development defaults; never reused in production.
+    environment:
+      POSTGRES_USER: middleware
+      POSTGRES_PASSWORD: middleware
+      POSTGRES_DB: middleware
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U middleware -d middleware"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    extra_hosts:
+      # Maps host.docker.internal to the host gateway. This works on Docker
+      # Desktop (macOS/Windows) and on Linux via the host-gateway value.
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres_data:

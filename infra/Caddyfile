@@ -1,0 +1,20 @@
+# Local development reverse proxy (Caddy 2).
+#
+# /api/* and /v1/* go to the API on the host (port 3001); every remaining path
+# goes to the Next.js web app on the host (port 3000). `host.docker.internal`
+# is provided by the host-gateway mapping in compose.dev.yaml, which works on
+# both Docker Desktop and Linux.
+
+:80 {
+	handle /api/* {
+		reverse_proxy host.docker.internal:3001
+	}
+
+	handle /v1/* {
+		reverse_proxy host.docker.internal:3001
+	}
+
+	handle {
+		reverse_proxy host.docker.internal:3000
+	}
+}
