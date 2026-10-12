@@ -1,0 +1,30 @@
+{
+  "name": "@middleware/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "lint": "biome check .",
+    "test": "vitest run",
+    "build": "tsc --noEmit --project tsconfig.json",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:migrate:apply": "tsx src/cli.ts migrate",
+    "db:seed": "tsx src/cli.ts seed"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.1",
+    "postgres": "3.4.7",
+    "uuid": "13.0.0",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "drizzle-kit": "0.31.11",
+    "tsx": "4.23.15"
+  }
+}
