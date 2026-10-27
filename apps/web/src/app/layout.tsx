@@ -1,7 +1,10 @@
+import { GeistMono } from "geist/font/mono";
+import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { messages } from "../messages";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: messages.metadata.title,
@@ -12,7 +15,10 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="es-AR">
+    <html
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      lang="es-AR"
+    >
       <body>{children}</body>
     </html>
   );

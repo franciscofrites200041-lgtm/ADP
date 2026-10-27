@@ -1,0 +1,186 @@
+/*
+ * Design tokens for the "warm and tactile" system (MIDDLEWARE_MASTER §11.1).
+ * Light is the default; dark follows the OS unless `data-theme` forces a mode.
+ * Components may only use the utilities generated from the @theme block below.
+ */
+
+/* Scan this package for utility classes even when imported from an app. */
+@source ".";
+
+:root {
+  --bg: #f8f1ec;
+  --surface: #efe5dc;
+  --surface-2: #f6eee7;
+  --raised: #fbf7f3;
+  --ink: #221b17;
+  --ink-2: #54473f;
+  --muted: #6e6259;
+  --accent: #d93d0b;
+  --on-accent: #ffffff;
+  --accent-text: #b8360a;
+  --accent-soft: #fbe3d6;
+  --accent-soft-ink: #8f2905;
+  --accent-gradient: linear-gradient(160deg, #ff7a45, #f04a12 60%, #d93d0b);
+  --connector: #f2a07e;
+  --dark-panel: radial-gradient(
+    120% 120% at 100% 0%,
+    #a99a90,
+    #5c4d45 42%,
+    #2b231f
+  );
+  /* Derived (not in §11.1): content on dark surfaces and the user chat bubble. */
+  --on-dark: #f3eae3;
+  --on-dark-2: #cdbfb4;
+  --dark-solid: #2b231f;
+  --success: #3f8f5a;
+  --warning: #c9a227;
+  --danger: #b42318;
+  --elev-raised: inset 0 1px 0 #ffffff, 0 1px 2px rgb(60 40 30 / 0.08);
+  --elev-panel: 0 10px 24px rgb(43 35 31 / 0.22);
+  --elev-accent:
+    inset 0 1px 0 rgb(255 255 255 / 0.35), 0 6px 14px rgb(217 61 11 / 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1b1613;
+    --surface: #251e1a;
+    --surface-2: #2b231f;
+    --raised: #342b26;
+    --ink: #f3eae3;
+    --ink-2: #cdbfb4;
+    --muted: #a89a8f;
+    --accent: #ff6a33;
+    --on-accent: #1b1613;
+    --accent-text: #ff8a5c;
+    --accent-soft: #4a2a1e;
+    --accent-soft-ink: #ffb899;
+    --connector: #c2643f;
+    --dark-panel: radial-gradient(
+      120% 120% at 100% 0%,
+      #6e5f56,
+      #3a2f2a 42%,
+      #15110f
+    );
+    --dark-solid: #3a2f2a;
+    --success: #6bc48a;
+    --warning: #e3c155;
+    --danger: #f97066;
+    --elev-raised:
+      inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 2px rgb(0 0 0 / 0.4);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1b1613;
+  --surface: #251e1a;
+  --surface-2: #2b231f;
+  --raised: #342b26;
+  --ink: #f3eae3;
+  --ink-2: #cdbfb4;
+  --muted: #a89a8f;
+  --accent: #ff6a33;
+  --on-accent: #1b1613;
+  --accent-text: #ff8a5c;
+  --accent-soft: #4a2a1e;
+  --accent-soft-ink: #ffb899;
+  --connector: #c2643f;
+  --dark-panel: radial-gradient(
+    120% 120% at 100% 0%,
+    #6e5f56,
+    #3a2f2a 42%,
+    #15110f
+  );
+  --dark-solid: #3a2f2a;
+  --success: #6bc48a;
+  --warning: #e3c155;
+  --danger: #f97066;
+  --elev-raised:
+    inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+/* Drop Tailwind's default palette, radii and shadows so only tokens remain. */
+@theme {
+  --color-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --text-*: initial;
+}
+
+/* Tailwind bridge: utilities resolve to the live CSS variables above. */
+@theme inline {
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-accent-text: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-ink: var(--accent-soft-ink);
+  --color-connector: var(--connector);
+  --color-on-dark: var(--on-dark);
+  --color-on-dark-2: var(--on-dark-2);
+  --color-dark-solid: var(--dark-solid);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --radius-card: 28px;
+  --radius-row: 20px;
+  --radius-bubble: 18px;
+  --radius-field: 16px;
+  --radius-tile: 12px;
+  --radius-pill: 999px;
+
+  --shadow-raised: var(--elev-raised);
+  --shadow-panel: var(--elev-panel);
+  --shadow-accent: var(--elev-accent);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --text-caption: 12px;
+  --text-small: 13px;
+  --text-body: 15px;
+  --text-body--line-height: 1.5;
+  --text-title: 17px;
+  --text-title--line-height: 1.5;
+  --text-heading: 22px;
+  --text-heading--line-height: 1.15;
+  --text-heading--letter-spacing: -0.02em;
+  --text-page: 26px;
+  --text-page--line-height: 1.15;
+  --text-page--letter-spacing: -0.03em;
+  --text-brand: 40px;
+  --text-brand--line-height: 1.15;
+  --text-brand--letter-spacing: -0.03em;
+}
+
+@utility bg-accent-gradient {
+  background-image: var(--accent-gradient);
+}
+
+@utility bg-dark-panel {
+  background-image: var(--dark-panel);
+}
+
+@layer base {
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
