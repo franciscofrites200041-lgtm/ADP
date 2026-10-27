@@ -38,6 +38,17 @@ const productTableNames = [
   "delivery",
 ] as const;
 
+/** Better Auth core and organization-plugin tables from MIDDLEWARE_MASTER.md §7. */
+const authTableNames = [
+  "user",
+  "session",
+  "account",
+  "verification",
+  "organization",
+  "member",
+  "invitation",
+] as const;
+
 describe("generated migration artifact", () => {
   it("contains a CREATE TABLE statement for every product-owned table", () => {
     for (const table of productTableNames) {
@@ -45,8 +56,14 @@ describe("generated migration artifact", () => {
     }
   });
 
-  it("emits exactly the 23 product-owned tables and nothing else", () => {
+  it("emits product and Better Auth tables without unrelated tables", () => {
     const createTableStatements = migrationSql.match(/CREATE TABLE "[^"]+"/g);
-    expect(createTableStatements).toHaveLength(productTableNames.length);
+    expect(createTableStatements).toHaveLength(
+      productTableNames.length + authTableNames.length,
+    );
+
+    for (const table of authTableNames) {
+      expect(migrationSql, table).toContain(`CREATE TABLE "${table}"`);
+    }
   });
 });

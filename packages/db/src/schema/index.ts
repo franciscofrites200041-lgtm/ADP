@@ -1,6 +1,7 @@
 export * from "./agent.js";
 export * from "./api-token.js";
 export * from "./audit.js";
+export * from "./auth.js";
 export * from "./conversation.js";
 export * from "./credential.js";
 export * from "./delivery.js";
