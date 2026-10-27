@@ -1,11 +1,7 @@
 export const messages = {
   metadata: {
     title: "Middleware",
-    description: "Middleware — entorno local (WP-01)",
-  },
-  home: {
-    title: "Middleware",
-    description: "Shell web de WP-01. Entorno local listo.",
+    description: "Un lugar para tus modelos y lo que hacen por vos.",
   },
   devUi: {
     title: "Sistema de diseño",
@@ -86,6 +82,137 @@ export const messages = {
       description: "Te vamos a enviar instrucciones para restablecerla.",
       submit: "Enviar instrucciones",
       sent: "Si existe una cuenta con ese email, te enviamos las instrucciones.",
+    },
+  },
+  appShell: {
+    navigationLabel: "Navegación principal",
+    brand: "Middleware",
+    openNavigation: "Abrir navegación",
+    closeNavigation: "Cerrar navegación",
+    workspace: "Tu workspace",
+    workspaceInitials: "TU",
+    navigation: {
+      home: "Inicio",
+      agents: "Agentes",
+      groups: "Grupos",
+      chats: "Chats",
+      providers: "Proveedores",
+      tools: "Herramientas",
+      schedules: "Tareas programadas",
+      approvals: "Aprobaciones",
+      runs: "Ejecuciones",
+      usage: "Uso",
+      settings: "Ajustes",
+    },
+    theme: {
+      label: "Tema",
+      system: "Sistema",
+      light: "Claro",
+      dark: "Oscuro",
+    },
+  },
+  home: {
+    greeting: "Hola",
+    workspaceName: "tu workspace",
+    title: "/tus keys\n/tus agentes",
+    description: "Un lugar para todos tus modelos y lo que hacen por vos.",
+    createTitle: "Empezá por acá",
+    createAgent: "Nuevo agente",
+    createSchedule: "Nueva tarea programada",
+    createConnection: "Nueva conexión",
+    providers: {
+      title: "Tus proveedores",
+      emptyTitle: "Todavía no conectaste ningún proveedor",
+      emptyDescription:
+        "Cuando cargues una key, tus modelos van a aparecer acá.",
+      action: "Conectar un proveedor",
+    },
+    flow: {
+      title: "Tu primer flujo",
+      description:
+        "Creá un agente y conectalo a una tarea para automatizar tu rutina.",
+      action: "Crear un agente",
+    },
+    usage: {
+      title: "Uso del mes",
+      emptyTitle: "Todavía no hay uso para mostrar",
+      description: "Las ejecuciones y sus costos se van a resumir acá.",
+    },
+    ask: {
+      placeholder: "Preguntale a un agente…",
+      label: "Preguntale a un agente",
+      dictate: "Dictar",
+      send: "Enviar",
+    },
+  },
+  emptyPages: {
+    agents: {
+      title: "Agentes",
+      emptyTitle: "Todavía no creaste agentes",
+      description:
+        "Creá tu primer agente para darle instrucciones, modelo y herramientas.",
+      action: "Crear agente",
+    },
+    groups: {
+      title: "Grupos",
+      emptyTitle: "Todavía no creaste grupos",
+      description:
+        "Cuando tengas agentes, podés reunirlos para trabajar en equipo.",
+      action: "Crear grupo",
+    },
+    chats: {
+      title: "Chats",
+      emptyTitle: "Todavía no hay conversaciones",
+      description: "Elegí un agente para empezar una conversación.",
+      action: "Ver agentes",
+    },
+    providers: {
+      title: "Proveedores",
+      emptyTitle: "Todavía no tenés proveedores",
+      description: "Conectá una key para usar los modelos de tu proveedor.",
+      action: "Conectar proveedor",
+    },
+    tools: {
+      title: "Herramientas",
+      emptyTitle: "Todavía no conectaste herramientas",
+      description:
+        "Sumá búsqueda, HTTP o un servidor MCP para ampliar tus agentes.",
+      action: "Agregar herramienta",
+    },
+    schedules: {
+      title: "Tareas programadas",
+      emptyTitle: "Todavía no programaste tareas",
+      description:
+        "Automatizá una ejecución para que corra cuando la necesites.",
+      action: "Crear tarea",
+    },
+    approvals: {
+      title: "Aprobaciones",
+      emptyTitle: "No tenés aprobaciones pendientes",
+      description:
+        "Las acciones que necesiten tu confirmación van a aparecer acá.",
+      action: "Ver ejecuciones",
+    },
+    runs: {
+      title: "Ejecuciones",
+      emptyTitle: "Todavía no hay ejecuciones",
+      description:
+        "Cuando uses un agente, vas a poder seguir su actividad desde acá.",
+      action: "Ver agentes",
+    },
+    usage: {
+      title: "Uso",
+      emptyTitle: "Todavía no hay uso para mostrar",
+      description:
+        "Los costos y tokens aparecen cuando corras tu primer agente.",
+      action: "Ver agentes",
+    },
+    settings: {
+      title: "Ajustes",
+      emptyTitle: "Configurá tu workspace",
+      description:
+        "Muy pronto vas a poder administrar tu perfil y preferencias desde acá.",
+      action: "Volver al inicio",
     },
   },
 } as const;

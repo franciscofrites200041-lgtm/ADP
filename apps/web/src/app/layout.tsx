@@ -1,6 +1,7 @@
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
+import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
 
 import { messages } from "../messages";
@@ -18,8 +19,11 @@ export default function RootLayout({
     <html
       className={`${GeistSans.variable} ${GeistMono.variable}`}
       lang="es-AR"
+      suppressHydrationWarning
     >
-      <body>{children}</body>
+      <body>
+        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+      </body>
     </html>
   );
 }
