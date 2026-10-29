@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 // typecheck and Vitest but crashes at startup, so import the real modules.
 const entrypoints = [
   "./index.ts",
+  "./container.ts",
   "./rotate-workspace-keys-db.ts",
   "./rotate-workspace-keys-cli.ts",
 ];
