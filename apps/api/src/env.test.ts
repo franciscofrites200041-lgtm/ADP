@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+import { ProviderKeyEnvError } from "@middleware/adapters";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
@@ -9,6 +11,8 @@ const valid = {
   BETTER_AUTH_URL: "http://localhost:3001",
   SMTP_URL: "smtp://user:pass@localhost:1025",
   MAIL_FROM: "Middleware <no-reply@localhost>",
+  MW_MASTER_KEY: randomBytes(32).toString("base64"),
+  MW_MASTER_KEY_VERSION: "v1",
 };
 
 describe("readEnv", () => {
@@ -40,5 +44,15 @@ describe("readEnv", () => {
   it("rejects a missing SMTP_URL", () => {
     const { SMTP_URL: _omit, ...env } = valid;
     expect(() => readEnv(env)).toThrow(ZodError);
+  });
+
+  it("refuses to start with OPENAI_API_KEY present", () => {
+    expect(() => readEnv({ ...valid, OPENAI_API_KEY: "sk-x" })).toThrow(
+      ProviderKeyEnvError,
+    );
+  });
+
+  it("rejects a master key that is not 32 bytes", () => {
+    expect(() => readEnv({ ...valid, MW_MASTER_KEY: "c2hvcnQ=" })).toThrow();
   });
 });

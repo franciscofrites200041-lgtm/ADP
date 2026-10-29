@@ -1,4 +1,8 @@
+import { checkWorkerEnv } from "./env.ts";
+
 const HEARTBEAT_MS = 30_000;
+
+checkWorkerEnv(process.env);
 
 console.log("[worker] started (WP-01 shell)");
 
