@@ -9,7 +9,8 @@ export class CryptoError extends Error {
     | "INVALID_KEY"
     | "UNKNOWN_KEK_VERSION"
     | "DECRYPT_FAILED"
-    | "WORKSPACE_KEY_NOT_FOUND";
+    | "WORKSPACE_KEY_NOT_FOUND"
+    | "WORKSPACE_KEY_CONFLICT";
 
   constructor(code: CryptoError["code"], message: string) {
     super(message);
