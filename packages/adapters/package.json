@@ -1,0 +1,22 @@
+{
+  "name": "@middleware/adapters",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "lint": "biome check .",
+    "test": "vitest run",
+    "build": "tsc --noEmit --project tsconfig.json",
+    "rotate:keys": "node src/rotate-workspace-keys-cli.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2"
+  },
+  "dependencies": {
+    "postgres": "3.4.7"
+  }
+}

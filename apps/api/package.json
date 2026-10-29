@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.7.7",
+    "@middleware/adapters": "workspace:*",
     "@hono/node-server": "2.1.0",
     "@middleware/db": "workspace:*",
     "better-auth": "^1.7.7",

@@ -7,10 +7,13 @@
     "dev": "node --watch src/index.ts",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "lint": "biome check .",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "build": "tsc --noEmit --project tsconfig.json"
   },
   "devDependencies": {
     "@types/node": "24.19.2"
+  },
+  "dependencies": {
+    "@middleware/adapters": "workspace:*"
   }
 }
