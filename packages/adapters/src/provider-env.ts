@@ -67,10 +67,13 @@ export const PROVIDER_CREDENTIAL_ENV_VARS: readonly string[] = [
 export class ProviderKeyEnvError extends Error {
   readonly code = "PROVIDER_KEY_ENV_PRESENT";
 
-  constructor(readonly vars: readonly string[]) {
+  readonly vars: readonly string[];
+
+  constructor(vars: readonly string[]) {
     // Names only; values are never included.
     super(`Provider credential variables must not be set: ${vars.join(", ")}`);
     this.name = "ProviderKeyEnvError";
+    this.vars = vars;
   }
 }
 
