@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@middleware/contracts": "workspace:*",
     "@middleware/ui": "workspace:*",
     "@tailwindcss/postcss": "4.3.3",
     "geist": "1.8.2",

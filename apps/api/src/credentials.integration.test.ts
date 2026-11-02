@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   createIntegrationHarness,
+  TEST_ORIGIN,
   type TestSession,
   testDatabaseUrl,
 } from "./testing/integration-harness.ts";
@@ -40,6 +41,7 @@ describe.skipIf(!url)("credential routes against postgres", () => {
       method,
       headers: {
         "content-type": "application/json",
+        origin: TEST_ORIGIN,
         ...(session ? { cookie: session.cookie } : {}),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -194,10 +196,41 @@ describe.skipIf(!url)("credential routes against postgres", () => {
     );
   });
 
+  it("rejects a write from another origin and creates nothing (S10)", async () => {
+    const before = await call(ana, "GET", "/api/credentials");
+    const body = {
+      providerId: "openai",
+      alias: "cross-site",
+      apiKey: "sk-cross-1234",
+    };
+    const evil = await harness.app.request("/api/credentials", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: ana.cookie,
+        origin: "https://evil.example.com",
+      },
+      body: JSON.stringify(body),
+    });
+    await expectError(evil, 403, "forbidden");
+    const missing = await harness.app.request("/api/credentials", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: ana.cookie },
+      body: JSON.stringify(body),
+    });
+    await expectError(missing, 403, "forbidden");
+    const after = await call(ana, "GET", "/api/credentials");
+    expect(await after.json()).toEqual(await before.json());
+  });
+
   it("answers 400 invalid_request for malformed JSON and ids", async () => {
     const res = await harness.app.request("/api/credentials", {
       method: "POST",
-      headers: { "content-type": "application/json", cookie: ana.cookie },
+      headers: {
+        "content-type": "application/json",
+        cookie: ana.cookie,
+        origin: TEST_ORIGIN,
+      },
       body: "{not json",
     });
     await expectError(res, 400, "invalid_request");

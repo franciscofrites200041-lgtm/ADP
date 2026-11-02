@@ -6,5 +6,6 @@ export const errorMessages: Record<ErrorCode, string> = {
   unauthorized: "Tenés que iniciar sesión.",
   not_found: "No encontramos lo que buscás.",
   alias_taken: "Ya tenés una credencial con ese alias.",
+  forbidden: "No pudimos verificar el origen del pedido.",
   unknown: "Algo salió mal. Probá de nuevo en un rato.",
 };

@@ -17,6 +17,8 @@ export interface CreateAppOptions {
   auth?: Auth;
   /** Credential use cases; mounted only together with `auth`. */
   credentials?: CredentialService;
+  /** Origins allowed to write; defaults to none, which rejects every write. */
+  allowedOrigins?: readonly string[];
   logger?: Logger;
 }
 
@@ -29,6 +31,7 @@ export function createApp({
   ready,
   auth,
   credentials,
+  allowedOrigins = [],
   logger = createLogger(),
 }: CreateAppOptions): Hono {
   const app = new Hono();
@@ -50,7 +53,9 @@ export function createApp({
   if (auth) {
     app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
     app.route("/", meRoutes(auth));
-    if (credentials) app.route("/", credentialRoutes(auth, credentials));
+    if (credentials) {
+      app.route("/", credentialRoutes(auth, credentials, allowedOrigins));
+    }
   }
 
   return app;

@@ -13,17 +13,26 @@ export interface CreateAuthOptions {
   mailer: Mailer;
 }
 
+/** A user without a workspace breaks an invariant; `apps/api` answers 500. */
+class WorkspaceResolutionError extends Error {
+  readonly code = "WORKSPACE_MISSING";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "WorkspaceResolutionError";
+  }
+}
 /**
  * Builds Better Auth (email/password + organization plugin). Identifiers use
  * the application's UUIDv7 generator. Each user gets exactly one organization
  * (= workspace) as `owner`, and every new session is pinned to it, so the
  * active workspace only ever comes from the session.
  *
- * The workspace is created in `session.create.before` rather than
- * `user.create.after` because Better Auth defers "after" hooks until the
- * sign-up request ends, i.e. after the first session already exists. Sign-up
- * auto-signs in, so the workspace still exists from registration.
+ * The workspace is created in `user.create.after`, once per user. Registration
+ * does not sign anyone in (`requireEmailVerification`), so no session exists
+ * yet; `session.create.before` only looks the workspace up and pins it.
  */
+
 export function createAuth({
   database,
   secret,
@@ -36,48 +45,67 @@ export function createAuth({
     database,
     secret,
     baseURL,
-    emailAndPassword: { enabled: true, sendResetPassword },
-    emailVerification: { sendVerificationEmail, sendOnSignUp: true },
+    emailAndPassword: {
+      enabled: true,
+      sendResetPassword,
+      // S10: no session before the user clicks the link in their inbox.
+      requireEmailVerification: true,
+    },
+    emailVerification: {
+      sendVerificationEmail,
+      sendOnSignUp: true,
+      // A rejected sign-in resends the link, so a lost mail is not a dead end.
+      sendOnSignIn: true,
+    },
     advanced: { database: { generateId: createId } },
     plugins: [organization({ allowUserToCreateOrganization: false })],
     databaseHooks: {
+      user: {
+        create: {
+          // One workspace per user, created once when the user is created.
+          after: async (user, ctx) => {
+            const adapter = ctx?.context.adapter;
+            if (!adapter) return;
+            const workspace = await adapter.create<{ id: string }>({
+              model: "organization",
+              data: {
+                name: user.name || "Workspace",
+                slug: `ws-${user.id}`,
+                createdAt: new Date(),
+              },
+            });
+            await adapter.create({
+              model: "member",
+              data: {
+                organizationId: workspace.id,
+                userId: user.id,
+                role: "owner",
+                createdAt: new Date(),
+              },
+            });
+          },
+        },
+      },
       session: {
         create: {
           before: async (session, ctx) => {
             const adapter = ctx?.context.adapter;
             if (!adapter) {
-              throw new Error("workspace resolution requires an auth context");
+              throw new WorkspaceResolutionError(
+                "workspace resolution requires an auth context",
+              );
             }
             const member = await adapter.findOne<{ organizationId: string }>({
               model: "member",
               where: [{ field: "userId", value: session.userId }],
             });
-            let workspaceId = member?.organizationId;
-            if (!workspaceId) {
-              const user = await adapter.findOne<{ name: string }>({
-                model: "user",
-                where: [{ field: "id", value: session.userId }],
-              });
-              const workspace = await adapter.create<{ id: string }>({
-                model: "organization",
-                data: {
-                  name: user?.name ?? "Workspace",
-                  slug: `ws-${session.userId}`,
-                  createdAt: new Date(),
-                },
-              });
-              await adapter.create({
-                model: "member",
-                data: {
-                  organizationId: workspace.id,
-                  userId: session.userId,
-                  role: "owner",
-                  createdAt: new Date(),
-                },
-              });
-              workspaceId = workspace.id;
+            if (!member) {
+              // Users get their workspace at creation; a missing one is a bug.
+              throw new WorkspaceResolutionError("workspace missing for user");
             }
-            return { data: { ...session, activeOrganizationId: workspaceId } };
+            return {
+              data: { ...session, activeOrganizationId: member.organizationId },
+            };
           },
         },
       },
