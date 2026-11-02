@@ -24,3 +24,11 @@ Set the GGA provider in `.gga` to `opencode`. Review scope, strict mode, timeout
 - **Codex**: rejected; blocked until 2026-11-29.
 - **Gemini CLI**: rejected for now; installed but without an auth method configured.
 - **Bypassing GGA**: rejected; it skips a mandatory control.
+
+## Model choice (2026-11-02)
+
+The provider line pins a model: `PROVIDER="opencode:opencode-go/claude-haiku-5-5"`.
+
+- `opencode-go/deepseek-v4.1-flash` was tried first, at the owner's request. It reviewed correctly (it even caught a CRLF file) but it does not emit GGA's `STATUS: PASSED` line in the first 30 lines, so strict mode failed closed. Loosening `STRICT_MODE` was rejected: it would let a vague review pass as approved.
+- `opencode-go/claude-haiku-5-5` follows the required format and produced a substantive review, so it is the pinned model.
+- To go back to deepseek, the only change needed is this one line plus a decision on `STRICT_MODE`.
