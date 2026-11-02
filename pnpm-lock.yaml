@@ -14,6 +14,9 @@ importers:
       '@playwright/test':
         specifier: 1.64.0
         version: 1.64.0
+      postgres:
+        specifier: 3.4.7
+        version: 3.4.7
       turbo:
         specifier: 2.11.7
         version: 2.11.7
