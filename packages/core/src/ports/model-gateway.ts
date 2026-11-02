@@ -30,7 +30,7 @@ export type ModelGateway = {
   }): Promise<ModelDescriptor[]>;
   /** The catalog entry, without touching the network; `null` if unknown. */
   findModel(providerId: ProviderId, modelId: string): ModelDescriptor | null;
-  /** Streams one completion. Implemented in WP-30, not here. */
+  /** Streams one completion; WP-30 turns these events into run events. */
   stream(target: ModelTarget): AsyncIterable<ProviderStreamEvent>;
 };
 
