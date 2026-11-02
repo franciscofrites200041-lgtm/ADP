@@ -5,3 +5,5 @@ allowBuilds:
   esbuild: true
   "@google/genai": true
   protobufjs: true
+  "@parcel/watcher": true
+  "@swc/core": true
