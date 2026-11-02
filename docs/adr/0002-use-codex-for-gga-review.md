@@ -1,6 +1,6 @@
 # ADR-0002: Use Codex for mandatory GGA pre-commit review
 
-- Status: Accepted
+- Status: Superseded by ADR-0004
 - Date: 2026-10-10
 
 ## Context
