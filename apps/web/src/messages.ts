@@ -1,4 +1,39 @@
 export const messages = {
+  providers: {
+    title: "Proveedores",
+    intro: "Conectá tus keys: quedan cifradas y solo las usa este workspace.",
+    emptyTitle: "Todavía no tenés proveedores",
+    emptyDescription: "Conectá una key para usar los modelos de tu proveedor.",
+    loading: "Cargando proveedores…",
+    errorTitle: "No pudimos cargar tus proveedores",
+    retry: "Reintentar",
+    formTitle: "Conectar un proveedor",
+    provider: "Proveedor",
+    alias: "Alias",
+    aliasHint: "Un nombre para reconocerla, por ejemplo Personal.",
+    apiKey: "API key",
+    apiKeyHint: "Se guarda cifrada y nunca se vuelve a mostrar.",
+    baseUrl: "URL del endpoint",
+    baseUrlHint: "Solo https, por ejemplo https://mi-servidor/v1.",
+    submit: "Conectar",
+    submitting: "Conectando…",
+    created: "Proveedor conectado.",
+    invalid: "Revisá los datos marcados.",
+    listTitle: "Conectados",
+    maskedHint: "Solo mostramos los últimos cuatro caracteres.",
+    baseUrlLabel: "Endpoint",
+    rename: "Renombrar",
+    renameSave: "Guardar",
+    renameCancel: "Cancelar",
+    archive: "Archivar",
+    archiveConfirm: "¿Archivar?",
+    archiveCancel: "Mejor no",
+    status: {
+      unchecked: "Sin probar",
+      valid: "Funciona",
+      invalid: "No funciona",
+    },
+  },
   metadata: {
     title: "Middleware",
     description: "Un lugar para tus modelos y lo que hacen por vos.",
@@ -61,7 +96,7 @@ export const messages = {
     },
     submitting: "Enviando…",
     googleDeferred:
-      "El inicio de sesión con Google estará disponible cuando se configuren sus credenciales.",
+      "El inicio de sesión con Google va a estar disponible cuando cargues tus credenciales.",
     errors: {
       submit:
         "No pudimos procesar tu solicitud. Revisá los datos e intentá de nuevo.",
