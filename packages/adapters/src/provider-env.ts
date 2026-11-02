@@ -8,7 +8,7 @@
  * Re-audit this list whenever `pi-ai` is upgraded.
  */
 export const PROVIDER_CREDENTIAL_ENV_VARS: readonly string[] = [
-  // Master document S5
+  // Master document S3
   "OPENAI_API_KEY",
   "ANTHROPIC_API_KEY",
   "GEMINI_API_KEY",
