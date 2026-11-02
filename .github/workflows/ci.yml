@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# One run per branch; a new push cancels the previous one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # The integration suites refuse anything but 127.0.0.1/middleware_test
+      # (they are the cross-tenant and secret-redaction ones), so the service
+      # database must use exactly that name; the init script creates it.
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: middleware
+          POSTGRES_PASSWORD: middleware
+          POSTGRES_DB: middleware
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U middleware -d middleware"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL_TEST: postgres://middleware:middleware@127.0.0.1:5432/middleware_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Create the disposable test database
+        run: psql "postgres://middleware:middleware@127.0.0.1:5432/middleware" -f infra/postgres/init-test-database.sql
+
+      # Unit tests, integration tests against the service database, lint and
+      # typecheck. A missing DATABASE_URL_TEST fails on purpose (see
+      # apps/api/src/integration-env.test.ts), so the security suites cannot
+      # disappear silently.
+      - name: Typecheck, lint and test
+        run: |
+          pnpm typecheck
+          pnpm lint
+          pnpm test
+
+      - name: Build the web app
+        run: pnpm --filter @middleware/web build
