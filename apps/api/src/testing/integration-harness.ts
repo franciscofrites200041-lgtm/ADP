@@ -15,7 +15,6 @@ import type { Logger } from "pino";
 import { createApp } from "../app.ts";
 import { type Auth, createAuth } from "../auth.ts";
 import { createLogger } from "../logger.ts";
-import type { MailMessage } from "../mailer.ts";
 
 class UnsafeTestDatabaseError extends Error {
   readonly code = "UNSAFE_TEST_DATABASE";
@@ -39,6 +38,9 @@ export function testDatabaseUrl(): string | undefined {
   return url;
 }
 
+/** The web origin the harness impersonates; requests must send it (S10). */
+export const TEST_ORIGIN = "http://localhost:3001";
+
 export type TestSession = {
   cookie: string;
   userId: string;
@@ -54,12 +56,11 @@ async function composeApp(url: string, logger: Logger, idGen: IdGen) {
     MW_MASTER_KEY_VERSION: "test-v1",
   });
   const db = createDbClient(url);
-  const sent: MailMessage[] = [];
   const auth = createAuth({
     database: drizzleAdapter(db, { provider: "pg" }),
     secret: "s".repeat(32),
     baseURL: "http://localhost:3001",
-    mailer: { send: async (message) => void sent.push(message) },
+    mailer: { send: async () => {} },
   });
   const credentials = createCredentialService({
     credentialRepo: createCredentialRepo(db),
@@ -71,7 +72,13 @@ async function composeApp(url: string, logger: Logger, idGen: IdGen) {
     clock: createSystemClock(),
     idGen,
   });
-  const app = createApp({ ready: async () => true, auth, credentials, logger });
+  const app = createApp({
+    ready: async () => true,
+    auth,
+    credentials,
+    allowedOrigins: [TEST_ORIGIN],
+    logger,
+  });
   const close = async () => {
     await db.$client.end();
     await container.close();
@@ -79,9 +86,19 @@ async function composeApp(url: string, logger: Logger, idGen: IdGen) {
   return { app, auth, sql: container.sql, close };
 }
 
-async function signUpAndSignIn(auth: Auth, email: string, name: string) {
+/** The postgres.js client composed above, without importing its types. */
+type HarnessSql = Awaited<ReturnType<typeof composeApp>>["sql"];
+
+async function signUpAndSignIn(
+  auth: Auth,
+  sql: HarnessSql,
+  email: string,
+  name: string,
+) {
   const password = `pw-${randomUUID()}`;
   await auth.api.signUpEmail({ body: { email, password, name } });
+  // Verification is required (S10); this is what clicking the link does.
+  await sql`update "user" set email_verified = true where email = ${email}`;
   const signIn = await auth.api.signInEmail({
     body: { email, password },
     returnHeaders: true,
@@ -114,7 +131,7 @@ export async function createIntegrationHarness(
   async function signUp(name: string): Promise<TestSession> {
     const email = `api-${randomUUID()}@example.com`;
     emails.push(email);
-    const session = await signUpAndSignIn(auth, email, name);
+    const session = await signUpAndSignIn(auth, sql, email, name);
     workspaceIds.push(session.workspaceId);
     return session;
   }

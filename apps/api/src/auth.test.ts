@@ -44,6 +44,31 @@ async function signUp(app: ReturnType<typeof setup>["app"], email: string) {
   return { res, cookie };
 }
 
+/** Register, mark the email verified (what the link does) and sign in. */
+async function signUpVerified(
+  app: ReturnType<typeof setup>["app"],
+  db: ReturnType<typeof setup>["db"],
+  email: string,
+) {
+  await signUp(app, email);
+  const user = db.user.find((candidate) => candidate.email === email);
+  if (!user) throw new Error();
+  user.emailVerified = true;
+  const res = await app.request("/api/auth/sign-in/email", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      origin: "http://localhost:3001",
+    },
+    body: JSON.stringify({ email, password: "correct-horse-1" }),
+  });
+  const cookie = res.headers
+    .getSetCookie()
+    .map((c) => c.split(";")[0])
+    .join("; ");
+  return { res, cookie };
+}
+
 async function me(
   app: ReturnType<typeof setup>["app"],
   cookie: string,
@@ -70,8 +95,8 @@ describe("auth", () => {
   });
 
   it("S1: rejects creating a second workspace through the organization API", async () => {
-    const { app } = setup();
-    const { cookie } = await signUp(app, "ana@example.com");
+    const { app, db } = setup();
+    const { cookie } = await signUpVerified(app, db, "ana@example.com");
 
     const res = await app.request("/api/auth/organization/create", {
       method: "POST",
@@ -91,7 +116,7 @@ describe("auth", () => {
 
   it("S2: /api/me returns the user and session workspace", async () => {
     const { app, db } = setup();
-    const { cookie } = await signUp(app, "ana@example.com");
+    const { cookie } = await signUpVerified(app, db, "ana@example.com");
 
     const res = await me(app, cookie);
     expect(res.status).toBe(200);
@@ -110,33 +135,44 @@ describe("auth", () => {
     });
   });
 
-  it("S2: sign-in works through the mounted /api/auth/* handler", async () => {
-    const { app } = setup();
+  it("S10: sign-in requires a verified email and works once verified", async () => {
+    const { app, db } = setup();
     await signUp(app, "ana@example.com");
-    const res = await app.request("/api/auth/sign-in/email", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        origin: "http://localhost:3001",
-      },
-      body: JSON.stringify({
-        email: "ana@example.com",
-        password: "correct-horse-1",
-      }),
-    });
-    expect(res.status).toBe(200);
-    const { cookie } = {
-      cookie: res.headers
-        .getSetCookie()
-        .map((c) => c.split(";")[0])
-        .join("; "),
-    };
+    const attempt = () =>
+      app.request("/api/auth/sign-in/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3001",
+        },
+        body: JSON.stringify({
+          email: "ana@example.com",
+          password: "correct-horse-1",
+        }),
+      });
+
+    // Unverified: rejected, and no session cookie is handed out.
+    const denied = await attempt();
+    expect(denied.status).toBe(403);
+    expect(denied.headers.getSetCookie()).toHaveLength(0);
+
+    // Clicking the verification link is what sets this flag.
+    const user = db.user[0];
+    if (!user) throw new Error("user was not created");
+    user.emailVerified = true;
+
+    const allowed = await attempt();
+    expect(allowed.status).toBe(200);
+    const cookie = allowed.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0])
+      .join("; ");
     expect((await me(app, cookie)).status).toBe(200);
   });
 
   it("S3: workspaceId in query, header or body never overrides the session", async () => {
     const { app, db } = setup();
-    const a = await signUp(app, "a@example.com");
+    const a = await signUpVerified(app, db, "a@example.com");
     await signUp(app, "b@example.com");
     const workspaceB = db.organization[1]?.id as string;
 

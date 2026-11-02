@@ -76,6 +76,13 @@ describe.skipIf(!url)("sign-up against postgres", () => {
         .map((m) => ({ to: m.to, subject: m.subject })),
     ).toEqual([{ to: email, subject: "Confirmá tu email" }]);
 
+    // Unverified sign-in is rejected (S10); clicking the link sets this flag.
+    const denied = await auth.api
+      .signInEmail({ body: { email, password } })
+      .catch((error: unknown) => error);
+    expect(denied).toMatchObject({ status: "FORBIDDEN" });
+    await sql`update "user" set email_verified = true where email = ${email}`;
+
     const signIn = await auth.api.signInEmail({
       body: { email, password },
       returnHeaders: true,
