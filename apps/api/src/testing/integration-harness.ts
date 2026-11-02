@@ -8,7 +8,7 @@ import {
   createSystemClock,
   createUuidV7IdGen,
 } from "@middleware/adapters";
-import { createCredentialService } from "@middleware/core";
+import { createCredentialService, type IdGen } from "@middleware/core";
 import { createDbClient, runMigrations } from "@middleware/db";
 import type { Logger } from "pino";
 
@@ -46,7 +46,7 @@ export type TestSession = {
 };
 
 /** The real app over the disposable database, composed like `index.ts`. */
-async function composeApp(url: string, logger: Logger) {
+async function composeApp(url: string, logger: Logger, idGen: IdGen) {
   await runMigrations(url);
   const container = await createContainer({
     DATABASE_URL: url,
@@ -69,7 +69,7 @@ async function composeApp(url: string, logger: Logger) {
     ),
     auditLog: createAuditLogRepo(db),
     clock: createSystemClock(),
-    idGen: createUuidV7IdGen(),
+    idGen,
   });
   const app = createApp({ ready: async () => true, auth, credentials, logger });
   const close = async () => {
@@ -105,8 +105,9 @@ async function signUpAndSignIn(auth: Auth, email: string, name: string) {
 export async function createIntegrationHarness(
   url: string,
   logger: Logger = createLogger(),
+  idGen: IdGen = createUuidV7IdGen(),
 ) {
-  const { app, auth, sql, close: end } = await composeApp(url, logger);
+  const { app, auth, sql, close: end } = await composeApp(url, logger, idGen);
   const emails: string[] = [];
   const workspaceIds: string[] = [];
 

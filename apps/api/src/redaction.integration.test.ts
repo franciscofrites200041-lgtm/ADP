@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Writable } from "node:stream";
+import { createUuidV7IdGen } from "@middleware/adapters";
 import { credentialResponseSchema } from "@middleware/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -21,6 +22,16 @@ describe.skipIf(!url)("key redaction against postgres", () => {
   const responses: string[] = [];
   let harness: Harness;
   let ana: TestSession;
+  // Repeating the previous id makes the next insert collide on the primary key
+  // after the key was sealed: a real database failure that is not the alias rule.
+  let repeatId = false;
+  let lastId = "";
+  const idGen = {
+    newId: () => {
+      if (!repeatId) lastId = createUuidV7IdGen().newId();
+      return lastId;
+    },
+  };
 
   beforeAll(async () => {
     const stream = new Writable({
@@ -29,7 +40,11 @@ describe.skipIf(!url)("key redaction against postgres", () => {
         done();
       },
     });
-    harness = await createIntegrationHarness(url ?? "", createLogger(stream));
+    harness = await createIntegrationHarness(
+      url ?? "",
+      createLogger(stream),
+      idGen,
+    );
     ana = await harness.signUp("Ana");
   }, 30_000);
 
@@ -69,8 +84,20 @@ describe.skipIf(!url)("key redaction against postgres", () => {
       (await call("PATCH", `/api/credentials/${id}`, { alias: "renamed" }))
         .status,
     ).toBe(200);
-    // Deliberate failures: the database rejects a NUL byte after sealing the
-    // key (logged as unknown), and the contract rejects an unknown field.
+    // Deliberate failures: a primary key collision after sealing the key (the
+    // failing query carries the sealed secret; logged as unknown), a control
+    // character the contract rejects, and an unknown field.
+    repeatId = true;
+    expect(
+      (
+        await call("POST", "/api/credentials", {
+          providerId: "openai",
+          alias: "collision",
+          apiKey: KEY,
+        })
+      ).status,
+    ).toBe(500);
+    repeatId = false;
     expect(
       (
         await call("POST", "/api/credentials", {
@@ -79,7 +106,7 @@ describe.skipIf(!url)("key redaction against postgres", () => {
           apiKey: KEY,
         })
       ).status,
-    ).toBe(500);
+    ).toBe(400);
     expect(
       (
         await call("POST", "/api/credentials", {

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import type { Auth } from "./auth.ts";
+import { errorResponse } from "./http-errors.ts";
 
 /**
  * `GET /api/me`: the signed-in user and their active workspace. The workspace
@@ -12,12 +13,7 @@ export function meRoutes(auth: Auth): Hono {
   app.get("/api/me", async (c) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     const workspaceId = session?.session.activeOrganizationId;
-    if (!session || !workspaceId) {
-      return c.json(
-        { error: { code: "UNAUTHENTICATED", message: "No iniciaste sesión." } },
-        401,
-      );
-    }
+    if (!session || !workspaceId) return errorResponse(c, "unauthorized");
     const { id, name, email } = session.user;
     return c.json({
       user: { id, name, email },
