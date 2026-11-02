@@ -29,13 +29,3 @@ export class AliasTakenError extends DomainError {
     super("alias_taken", message);
   }
 }
-
-/** Marks a use case signature from a contracts PR; never reaches the API. */
-export class NotImplementedError extends Error {
-  readonly code = "not_implemented";
-
-  constructor(useCase: string) {
-    super(`${useCase} is not implemented yet`);
-    this.name = "NotImplementedError";
-  }
-}
