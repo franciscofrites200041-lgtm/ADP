@@ -10,6 +10,7 @@ const entrypoints = [
   "./audit-log-repo.ts",
   "./credential-repo.ts",
   "./credential-secret-vault.ts",
+  "./pi-model-gateway.ts",
   "./system-ports.ts",
   "./rotate-workspace-keys-db.ts",
   "./rotate-workspace-keys-cli.ts",
