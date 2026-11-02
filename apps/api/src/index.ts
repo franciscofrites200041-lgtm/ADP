@@ -16,14 +16,19 @@ import { createAuth } from "./auth.ts";
 import { readEnv } from "./env.ts";
 import { createLogger } from "./logger.ts";
 import { createSmtpMailer } from "./mailer.ts";
+import { registerShutdown } from "./shutdown.ts";
 
 const port = 3001;
 
 // First: refuses provider keys and invalid configuration before anything starts (S3).
 const container = await createContainer(process.env);
-const { BETTER_AUTH_SECRET, BETTER_AUTH_URL, SMTP_URL, MAIL_FROM } = readEnv(
-  process.env,
-);
+const {
+  BETTER_AUTH_SECRET,
+  BETTER_AUTH_URL,
+  SMTP_URL,
+  MAIL_FROM,
+  MW_SHUTDOWN_GRACE_SECONDS,
+} = readEnv(process.env);
 // Better Auth keeps its own Drizzle client until WP-03 moves it into the container.
 const dbClient = createDbClient(container.env.DATABASE_URL);
 // The adapter reads the schema from the client (`db._.fullSchema`).
@@ -52,6 +57,17 @@ const app = createApp({
   logger,
 });
 
-serve({ fetch: app.fetch, port }, () => {
+const server = serve({ fetch: app.fetch, port }, () => {
   logger.info(`[api] listening on port ${port}`);
+});
+
+registerShutdown({
+  server,
+  close: async () => {
+    await container.close();
+    await dbClient.$client.end();
+  },
+  logger,
+  graceMs: MW_SHUTDOWN_GRACE_SECONDS * 1000,
+  exit: (code) => process.exit(code),
 });

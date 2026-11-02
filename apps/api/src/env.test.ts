@@ -12,8 +12,8 @@ const valid = {
 };
 
 describe("readEnv", () => {
-  it("returns the validated variables", () => {
-    expect(readEnv(valid)).toEqual(valid);
+  it("returns the validated variables, with the defaults applied", () => {
+    expect(readEnv(valid)).toEqual({ ...valid, MW_SHUTDOWN_GRACE_SECONDS: 60 });
   });
 
   it("rejects a short BETTER_AUTH_SECRET", () => {
@@ -31,5 +31,21 @@ describe("readEnv", () => {
   it("rejects a missing SMTP_URL", () => {
     const { SMTP_URL: _omit, ...env } = valid;
     expect(() => readEnv(env)).toThrow(ZodError);
+  });
+
+  it("defaults the shutdown grace to 60 seconds and coerces a given value", () => {
+    expect(readEnv(valid).MW_SHUTDOWN_GRACE_SECONDS).toBe(60);
+    expect(
+      readEnv({ ...valid, MW_SHUTDOWN_GRACE_SECONDS: "15" })
+        .MW_SHUTDOWN_GRACE_SECONDS,
+    ).toBe(15);
+  });
+
+  it("rejects a shutdown grace that is zero, negative or not a number", () => {
+    for (const value of ["0", "-5", "soon", "1.5"]) {
+      expect(() =>
+        readEnv({ ...valid, MW_SHUTDOWN_GRACE_SECONDS: value }),
+      ).toThrow(ZodError);
+    }
   });
 });

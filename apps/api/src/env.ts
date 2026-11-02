@@ -5,6 +5,8 @@ const envSchema = z.object({
   BETTER_AUTH_URL: z.url(),
   SMTP_URL: z.string().min(1),
   MAIL_FROM: z.string().min(1),
+  /** §18: how long a graceful shutdown may take. */
+  MW_SHUTDOWN_GRACE_SECONDS: z.coerce.number().int().positive().default(60),
 });
 
 export type ApiEnv = z.infer<typeof envSchema>;
