@@ -105,8 +105,8 @@ describe("auth", () => {
     const { app } = setup();
     const res = await app.request("/api/me");
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({
-      error: { code: "UNAUTHENTICATED" },
+    expect(await res.json()).toEqual({
+      error: { code: "unauthorized", message: "Tenés que iniciar sesión." },
     });
   });
 

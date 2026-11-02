@@ -12,12 +12,15 @@
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.7.7",
-    "@middleware/adapters": "workspace:*",
     "@hono/node-server": "2.1.0",
+    "@middleware/adapters": "workspace:*",
+    "@middleware/contracts": "workspace:*",
+    "@middleware/core": "workspace:*",
     "@middleware/db": "workspace:*",
     "better-auth": "^1.7.7",
     "hono": "4.13.0",
     "nodemailer": "^10.2.1",
+    "pino": "10.4.0",
     "zod": "4.6.6"
   },
   "devDependencies": {

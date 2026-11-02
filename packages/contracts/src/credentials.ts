@@ -2,7 +2,14 @@ import { z } from "zod";
 
 import { providerCatalog, providerIdSchema } from "./providers.ts";
 
-const aliasSchema = z.string().trim().min(1).max(255);
+// No control characters (NUL, newlines, tabs, DEL): Postgres rejects NUL and
+// the others would break logs and the UI. Accents, emoji and spaces are fine.
+const aliasSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(255)
+  .regex(/^[^\p{Cc}]+$/u);
 
 export const credentialStatusSchema = z.enum(["unchecked", "valid", "invalid"]);
 export type CredentialStatus = z.infer<typeof credentialStatusSchema>;

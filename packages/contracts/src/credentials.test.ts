@@ -82,6 +82,35 @@ describe("create credential request", () => {
   });
 });
 
+describe("alias characters", () => {
+  const valid = {
+    providerId: "anthropic",
+    alias: "Work",
+    apiKey: "sk-test-12345678",
+  };
+
+  it.each([
+    ["a NUL byte", "nul\u0000byte"],
+    ["a newline", "two\nlines"],
+    ["a tab", "tab\there"],
+    ["DEL", "del\u007fchar"],
+  ])("rejects %s in create and rename", (_case, alias) => {
+    expect(
+      createCredentialRequestSchema.safeParse({ ...valid, alias }).success,
+    ).toBe(false);
+    expect(renameCredentialRequestSchema.safeParse({ alias }).success).toBe(
+      false,
+    );
+  });
+
+  it("keeps accepting accents, emoji and spaces inside the alias", () => {
+    const alias = "Producción del equipo 🔑";
+    expect(createCredentialRequestSchema.parse({ ...valid, alias }).alias).toBe(
+      alias,
+    );
+  });
+});
+
 describe("rename and id param", () => {
   it("accepts a new alias and rejects an empty one", () => {
     expect(renameCredentialRequestSchema.parse({ alias: " Main " })).toEqual({
