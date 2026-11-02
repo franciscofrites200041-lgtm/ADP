@@ -13,6 +13,15 @@ export interface CreateAuthOptions {
   mailer: Mailer;
 }
 
+/** A user without a workspace breaks an invariant; `apps/api` answers 500. */
+class WorkspaceResolutionError extends Error {
+  readonly code = "WORKSPACE_MISSING";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "WorkspaceResolutionError";
+  }
+}
 /**
  * Builds Better Auth (email/password + organization plugin). Identifiers use
  * the application's UUIDv7 generator. Each user gets exactly one organization
@@ -24,15 +33,6 @@ export interface CreateAuthOptions {
  * yet; `session.create.before` only looks the workspace up and pins it.
  */
 
-/** A user without a workspace breaks an invariant; `apps/api` answers 500. */
-class WorkspaceResolutionError extends Error {
-  readonly code = "WORKSPACE_MISSING";
-
-  constructor(message: string) {
-    super(message);
-    this.name = "WorkspaceResolutionError";
-  }
-}
 export function createAuth({
   database,
   secret,

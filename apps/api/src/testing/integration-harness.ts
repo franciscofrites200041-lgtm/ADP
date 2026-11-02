@@ -59,7 +59,7 @@ async function composeApp(url: string, logger: Logger, idGen: IdGen) {
   const auth = createAuth({
     database: drizzleAdapter(db, { provider: "pg" }),
     secret: "s".repeat(32),
-    baseURL: "http://localhost:3001",
+    baseURL: TEST_ORIGIN,
     mailer: { send: async () => {} },
   });
   const credentials = createCredentialService({
