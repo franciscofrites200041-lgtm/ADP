@@ -11,21 +11,16 @@ export class DomainError extends Error {
   }
 }
 
-export class InvalidRequestError extends DomainError {
-  constructor(message = "Invalid request") {
-    super("invalid_request", message);
-  }
-}
-
 /** Also thrown for another workspace's resources, so they read as missing (S4). */
 export class NotFoundError extends DomainError {
-  constructor(message = "Resource not found") {
-    super("not_found", message);
+  /** Developer-facing only: the API maps `code` to the Spanish catalog. */
+  constructor(detail = "not_found") {
+    super("not_found", detail);
   }
 }
 
 export class AliasTakenError extends DomainError {
-  constructor(message = "Alias already in use in this workspace") {
-    super("alias_taken", message);
+  constructor(detail = "alias_taken") {
+    super("alias_taken", detail);
   }
 }

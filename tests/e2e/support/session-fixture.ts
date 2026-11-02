@@ -80,7 +80,13 @@ export async function createSession(): Promise<SessionFixture> {
       select m.organization_id from member m
       join "user" u on u.id = m.user_id
       where u.email = ${email}`;
-    if (!row) throw new Error("the new user has no workspace");
+    if (!row) {
+      // The user was created, but not in this database: the API is pointing
+      // somewhere else and the run would pollute it.
+      throw new Error(
+        "the API is not running against DATABASE_URL_TEST: start it with DATABASE_URL set to the same disposable database.",
+      );
+    }
 
     const signIn = await postJson(auth("sign-in/email"), E2E_WEB_ORIGIN, {
       email,

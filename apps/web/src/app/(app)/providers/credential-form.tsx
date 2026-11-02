@@ -14,6 +14,7 @@ import { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { needsBaseUrl } from "./providers-helpers.ts";
+import { userMessage } from "./queries.ts";
 
 type FormValues = {
   providerId: string;
@@ -136,8 +137,8 @@ export function CredentialForm({
             </p>
           ) : null}
           {mutation.error ? (
-            <p className="text-small text-accent-text" role="alert">
-              {mutation.error.message}
+            <p className="text-small text-danger" role="alert">
+              {userMessage(mutation.error, t("errorTitle"))}
             </p>
           ) : null}
         </div>

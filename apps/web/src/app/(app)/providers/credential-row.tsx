@@ -11,7 +11,7 @@ import {
   providerLabel,
   providerMonogram,
 } from "./providers-helpers.ts";
-import type { ArchiveInput, RenameInput } from "./queries.ts";
+import { type ArchiveInput, type RenameInput, userMessage } from "./queries.ts";
 
 type RowProps = {
   credential: CredentialResponse;
@@ -140,8 +140,8 @@ export function CredentialRow({ credential, rename, archive }: RowProps) {
         </div>
       )}
       {rowError ? (
-        <p className="w-full text-small text-accent-text" role="alert">
-          {rowError.message}
+        <p className="w-full text-small text-danger" role="alert">
+          {userMessage(rowError, t("errorTitle"))}
         </p>
       ) : null}
     </RaisedRow>

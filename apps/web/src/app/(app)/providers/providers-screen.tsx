@@ -10,6 +10,7 @@ import {
   useCreateCredential,
   useCredentials,
   useRenameCredential,
+  userMessage,
 } from "./queries.ts";
 
 /** The Providers screen: list, states and the create form. */
@@ -34,7 +35,9 @@ export function ProvidersScreen() {
       {list.isError ? (
         <Card className="space-y-3 p-5">
           <p className="text-body text-ink">{t("errorTitle")}</p>
-          <p className="text-small text-ink-2">{list.error.message}</p>
+          <p className="text-small text-ink-2">
+            {userMessage(list.error, fallback)}
+          </p>
           <button
             type="button"
             className="min-h-11 rounded-field bg-raised px-4 text-small font-medium text-ink shadow-raised"
@@ -56,7 +59,7 @@ export function ProvidersScreen() {
 
       {list.data && list.data.length > 0 ? (
         <section className="space-y-2" aria-label={t("listTitle")}>
-          <h2 className="px-1 text-small font-medium uppercase tracking-wide text-muted">
+          <h2 className="px-1 text-small font-medium text-muted">
             {t("listTitle")}
           </h2>
           {list.data.map((credential) => (

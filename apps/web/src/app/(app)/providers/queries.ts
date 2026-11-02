@@ -34,12 +34,12 @@ async function requestJson<T>(
   fallback: string,
 ): Promise<T> {
   const response = await fetch(path, withJson(init));
-  if (!response.ok) throw new Error(await failure(response, fallback));
+  if (!response.ok) throw new ClientError(await failure(response, fallback));
   try {
     return parse(await response.json());
   } catch {
     // A body that breaks the contract must not show a raw schema error.
-    throw new Error(fallback);
+    throw new ClientError(fallback);
   }
 }
 
@@ -49,7 +49,7 @@ async function requestVoid(
   fallback: string,
 ): Promise<void> {
   const response = await fetch(path, withJson(init));
-  if (!response.ok) throw new Error(await failure(response, fallback));
+  if (!response.ok) throw new ClientError(await failure(response, fallback));
 }
 
 const withJson = (init: RequestInit): RequestInit => {
@@ -61,8 +61,21 @@ const withJson = (init: RequestInit): RequestInit => {
   return { ...init, credentials: "include", headers };
 };
 
+/** Every error the screen can show, with a message that is already Spanish. */
+export class ClientError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ClientError";
+  }
+}
+
 const failure = async (response: Response, fallback: string) =>
   apiErrorMessage(await response.json().catch(() => null), fallback);
+
+/** The text a component may render: never a raw exception message. */
+export function userMessage(error: unknown, fallback: string): string {
+  return error instanceof ClientError ? error.message : fallback;
+}
 
 export function useCredentials(
   fallback: string,
@@ -108,7 +121,7 @@ export function useRenameCredential(
     mutationFn: ({ id, alias }) => {
       // Validated here too, and the failure is already user-facing Spanish.
       const parsed = renameCredentialRequestSchema.safeParse({ alias });
-      if (!parsed.success) throw new Error(fallback);
+      if (!parsed.success) throw new ClientError(fallback);
       return requestJson(
         `/api/credentials/${encodeURIComponent(id)}`,
         { method: "PATCH", body: JSON.stringify(parsed.data) },
