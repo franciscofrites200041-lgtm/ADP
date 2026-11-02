@@ -72,6 +72,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@middleware/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@middleware/ui':
         specifier: workspace:*
         version: link:../../packages/ui
