@@ -20,12 +20,19 @@ export type SessionFixture = {
 };
 
 const httpUrl = z.url({ protocol: /^https?$/ });
+// A postgres URL, not http: each border gets the shape it really has.
+const postgresUrl = z.url({ protocol: /^postgres(ql)?$/ });
 
 const environmentSchema = z.object({
   E2E_WEB_ORIGIN: httpUrl.default("http://localhost:3000"),
   API_INTERNAL_URL: httpUrl.default("http://localhost:3001"),
-  // A postgres URL, not http: each border gets the shape it really has.
-  DATABASE_URL_TEST: z.url({ protocol: /^postgres(ql)?$/ }),
+  DATABASE_URL_TEST: postgresUrl,
+  /**
+   * The database the API under test was started with. Required so a run cannot
+   * silently create rows in a database nobody planned to touch: it has to be
+   * the same disposable one this fixture cleans up.
+   */
+  E2E_API_DATABASE_URL: postgresUrl,
 });
 
 /** Better Auth's own answer; we only need to know it is what we expect. */
@@ -53,10 +60,19 @@ const postJson = async (
 
 /** Creates a signed-in user with a verified email and returns its cookie. */
 export async function createSession(): Promise<SessionFixture> {
-  const { E2E_WEB_ORIGIN, API_INTERNAL_URL, DATABASE_URL_TEST } =
-    environmentSchema.parse(process.env);
+  const {
+    E2E_WEB_ORIGIN,
+    API_INTERNAL_URL,
+    DATABASE_URL_TEST,
+    E2E_API_DATABASE_URL,
+  } = environmentSchema.parse(process.env);
   if (!disposableDatabase(DATABASE_URL_TEST)) {
     throw new Error("Refusing to run against a non-disposable database");
+  }
+  if (E2E_API_DATABASE_URL !== DATABASE_URL_TEST) {
+    throw new Error(
+      "The API under test is not running against DATABASE_URL_TEST: start it with DATABASE_URL set to the same disposable database (see the spec header).",
+    );
   }
 
   const email = `e2e-${randomUUID()}@example.com`;

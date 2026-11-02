@@ -1,14 +1,20 @@
-import { expect, test, type BrowserContext } from "@playwright/test";
+import { type BrowserContext, expect, test } from "@playwright/test";
 
-import { createSession, type SessionFixture } from "./support/session-fixture.ts";
+import {
+  createSession,
+  type SessionFixture,
+} from "./support/session-fixture.ts";
 
 /**
  * The Providers screen (WP-10) against the real API.
  *
  * Needs, before running: the API on `API_INTERNAL_URL` (default
  * http://localhost:3001) with the disposable PostgreSQL, and
- * `DATABASE_URL_TEST=postgres://mw_test@127.0.0.1:55432/middleware_test`.
- * Without that variable the spec skips instead of silently passing.
+ * `DATABASE_URL_TEST=postgres://mw_test@127.0.0.1:55432/middleware_test` and
+ * `E2E_API_DATABASE_URL` set to the same URL, because the API must have been
+ * started against that database: the fixture refuses to create anything when
+ * they differ, so a run cannot pollute another database. Without
+ * DATABASE_URL_TEST the spec skips instead of silently passing.
  */
 const databaseUrl = process.env.DATABASE_URL_TEST;
 
@@ -36,7 +42,9 @@ const KEY = "sk-e2e-1234567890";
 
 async function openProviders(page: import("@playwright/test").Page) {
   await page.goto("/providers");
-  await expect(page.getByRole("heading", { name: "Proveedores", level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Proveedores", level: 1 }),
+  ).toBeVisible();
 }
 
 async function fillCredential(
@@ -51,7 +59,9 @@ async function fillCredential(
 
 test("shows the form and the empty state", async ({ page }) => {
   await openProviders(page);
-  await expect(page.getByRole("heading", { name: "Conectar un proveedor" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Conectar un proveedor" }),
+  ).toBeVisible();
   await expect(page.getByText("Todavía no tenés proveedores")).toBeVisible();
 });
 
@@ -62,7 +72,9 @@ test("rejects a short key without creating anything", async ({ page }) => {
   await expect(page.getByText("Todavía no tenés proveedores")).toBeVisible();
 });
 
-test("creates a credential showing only its last four characters", async ({ page }) => {
+test("creates a credential showing only its last four characters", async ({
+  page,
+}) => {
   await openProviders(page);
   await fillCredential(page, "Personal", KEY);
 
@@ -100,7 +112,9 @@ test("archives a credential after confirming", async ({ page }) => {
   await expect(page.getByText("Para archivar")).toHaveCount(0);
 });
 
-test("shows the base URL field only for openai-compatible", async ({ page }) => {
+test("shows the base URL field only for openai-compatible", async ({
+  page,
+}) => {
   await openProviders(page);
   await expect(page.getByLabel("URL del endpoint")).toHaveCount(0);
   // The pill styles the input as visually hidden; click the control directly.
