@@ -116,6 +116,15 @@ importers:
 
   packages/adapters:
     dependencies:
+      '@middleware/core':
+        specifier: workspace:*
+        version: link:../core
+      '@middleware/db':
+        specifier: workspace:*
+        version: link:../db
+      drizzle-orm:
+        specifier: 0.45.1
+        version: 0.45.1(kysely@0.29.6)(postgres@3.4.7)
       postgres:
         specifier: 3.4.7
         version: 3.4.7

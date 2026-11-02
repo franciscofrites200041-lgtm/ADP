@@ -7,6 +7,10 @@ import { describe, expect, it } from "vitest";
 const entrypoints = [
   "./index.ts",
   "./container.ts",
+  "./audit-log-repo.ts",
+  "./credential-repo.ts",
+  "./credential-secret-vault.ts",
+  "./system-ports.ts",
   "./rotate-workspace-keys-db.ts",
   "./rotate-workspace-keys-cli.ts",
 ];
