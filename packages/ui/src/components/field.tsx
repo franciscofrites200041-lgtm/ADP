@@ -4,8 +4,9 @@ import { cn } from "../cn.ts";
 
 interface FieldProps extends Omit<ComponentProps<"input">, "id"> {
   label: string;
-  hint?: string;
-  error?: string;
+  // Widened for `exactOptionalPropertyTypes`: callers spread optional values in.
+  hint?: string | undefined;
+  error?: string | undefined;
 }
 
 export function Field({ label, hint, error, className, ...props }: FieldProps) {
