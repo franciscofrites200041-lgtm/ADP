@@ -53,6 +53,17 @@ export const PROVIDER_CREDENTIAL_ENV_VARS: readonly string[] = [
   "XIAOMI_TOKEN_PLAN_CN_API_KEY",
   "XIAOMI_TOKEN_PLAN_AMS_API_KEY",
   "XIAOMI_TOKEN_PLAN_SGP_API_KEY",
+  // pi-ai 1.1.0 ambient Google Vertex path: these three make `getEnvApiKey`
+  // report an authenticated provider, and the ADC fallback also probes
+  // ~/.config/gcloud without GOOGLE_APPLICATION_CREDENTIALS.
+  "GOOGLE_CLOUD_PROJECT",
+  "GCLOUD_PROJECT",
+  "GOOGLE_CLOUD_LOCATION",
+  // pi-ai 1.1.0 Anthropic federated auth: non-secret ids that appear next to
+  // variables we already block, kept here so the guard matches the pinned
+  // version exactly.
+  "ANTHROPIC_ORGANIZATION_ID",
+  "ANTHROPIC_WORKSPACE_ID",
   // pi-ai: Vertex ADC and Amazon Bedrock credential sources
   "GOOGLE_APPLICATION_CREDENTIALS",
   "AWS_PROFILE",
