@@ -2,7 +2,7 @@
  * Provider credential variables that `pi-ai` reads implicitly when no explicit
  * key is passed (see `getApiKeyEnvVars` / `getEnvApiKey` in
  * `@earendil-works/pi-ai` 1.4.0 `env-api-keys.js`), plus the names listed in
- * MIDDLEWARE_MASTER.md §8 S5. Provider keys must only ever be passed
+ * MAESTRO_PLATAFORMA.md §8 S3. Provider keys must only ever be passed
  * explicitly per execution, so API and worker refuse to start if any exist.
  *
  * Re-audit this list whenever `pi-ai` is upgraded.
