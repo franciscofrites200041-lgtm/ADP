@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { AppShell } from "./_components/app-shell";
+import { QueryProvider } from "./_components/query-provider";
 import { currentSession } from "./session";
 
 /**
@@ -13,5 +14,9 @@ export default async function AuthenticatedLayout({
 }: Readonly<{ children: ReactNode }>) {
   const session = await currentSession();
   if (!session) redirect("/login");
-  return <AppShell>{children}</AppShell>;
+  return (
+    <QueryProvider>
+      <AppShell>{children}</AppShell>
+    </QueryProvider>
+  );
 }

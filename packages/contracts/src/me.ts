@@ -5,7 +5,7 @@ export const meResponseSchema = z.strictObject({
   user: z.strictObject({
     id: z.uuid(),
     name: z.string(),
-    email: z.string(),
+    email: z.email(),
   }),
   workspace: z.strictObject({ id: z.uuid() }),
 });

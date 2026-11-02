@@ -4,8 +4,9 @@ import { cn } from "../cn.ts";
 
 interface FieldProps extends Omit<ComponentProps<"input">, "id"> {
   label: string;
-  hint?: string;
-  error?: string;
+  // Widened for `exactOptionalPropertyTypes`: callers spread optional values in.
+  hint?: string | undefined;
+  error?: string | undefined;
 }
 
 export function Field({ label, hint, error, className, ...props }: FieldProps) {
@@ -19,14 +20,14 @@ export function Field({ label, hint, error, className, ...props }: FieldProps) {
         {label}
       </label>
       <input
-        aria-describedby={note ? noteId : undefined}
-        aria-invalid={error ? true : undefined}
         className={cn(
           "min-h-11 rounded-field bg-raised px-4 text-body text-ink shadow-raised placeholder:text-muted",
           className,
         )}
         id={id}
         {...props}
+        aria-describedby={note ? noteId : undefined}
+        aria-invalid={error ? true : undefined}
       />
       {note ? (
         <p
