@@ -11,15 +11,15 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { createId } from "../id.js";
+import { createId } from "../id.ts";
 import {
   deliveryChannelKind,
   deliveryChannelStatus,
   deliveryStatus,
   deliveryTargetFormat,
   deliveryTargetOwnerType,
-} from "./enums.js";
-import { run } from "./run.js";
+} from "./enums.ts";
+import { run } from "./run.ts";
 
 /** A verified destination (email or WhatsApp number) the user can receive on. */
 export const deliveryChannel = pgTable(

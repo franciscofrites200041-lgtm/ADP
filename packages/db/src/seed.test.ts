@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { DbClient } from "./client.js";
-import { type SeedStep, seed, seedSteps } from "./seed.js";
+import type { DbClient } from "./client.ts";
+import { type SeedStep, seed, seedSteps } from "./seed.ts";
 
 function fakeDb(): DbClient {
   return {} as unknown as DbClient;

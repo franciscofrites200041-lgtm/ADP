@@ -1,7 +1,7 @@
 import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
-import { createId } from "../id.js";
-import { agent } from "./agent.js";
+import { createId } from "../id.ts";
+import { agent } from "./agent.ts";
 
 /** A thread of messages between a user and an agent. */
 export const conversation = pgTable(
