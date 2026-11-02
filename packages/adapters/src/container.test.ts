@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 
 import { ContainerConfigError, createContainer } from "./container.ts";
@@ -31,6 +32,29 @@ describe("createContainer configuration", () => {
     ).rejects.toBeInstanceOf(CryptoError);
   });
 
+  it("keeps secrets out of anything that serializes or prints the container", async () => {
+    const masterKey = randomBytes(32).toString("base64");
+    const container = await createContainer({
+      ...validEnv,
+      DATABASE_URL: "postgres://user:db-password-xyz@127.0.0.1:1/x",
+      MW_MASTER_KEY: masterKey,
+    });
+    try {
+      const keyBytes = Array.from(container.keyring.current.key.subarray(0, 8))
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join(" ");
+      const printed = `${JSON.stringify(container)} ${inspect(container, { depth: 6 })}`;
+
+      expect(printed).not.toContain(masterKey);
+      expect(printed).not.toContain(keyBytes);
+      expect(printed).not.toContain("db-password-xyz");
+      // Still reachable on purpose: the API needs the URL to build its own client.
+      expect(container.env.DATABASE_URL).toContain("db-password-xyz");
+    } finally {
+      await container.close();
+    }
+  });
+
   it("names invalid fields without echoing their values", async () => {
     const { MW_MASTER_KEY_VERSION: _omit, ...missingVersion } = validEnv;
     const error = await createContainer({
@@ -45,6 +69,16 @@ describe("createContainer configuration", () => {
       "MW_MASTER_KEY_VERSION",
     ]);
     expect(String(error)).not.toContain("hunter2");
+  });
+
+  it("rejects a missing or empty DATABASE_URL", async () => {
+    const { DATABASE_URL: _omit, ...missingUrl } = validEnv;
+    for (const env of [missingUrl, { ...validEnv, DATABASE_URL: "" }]) {
+      await expect(createContainer(env)).rejects.toMatchObject({
+        code: "INVALID_CONFIG",
+        fields: ["DATABASE_URL"],
+      });
+    }
   });
 });
 

@@ -1,8 +1,9 @@
-import type postgres from "postgres";
+import postgres from "postgres";
 import { z } from "zod";
 
-import type { Keyring } from "./envelope.ts";
-import type { createWorkspaceKeyVault } from "./workspace-key-vault.ts";
+import { type Keyring, keyringFromEnv } from "./envelope.ts";
+import { assertNoProviderKeys } from "./provider-env.ts";
+import { createWorkspaceKeyVault } from "./workspace-key-vault.ts";
 
 /** Configuration every process that builds the container must provide. */
 export const containerEnvSchema = z.object({
@@ -35,26 +36,41 @@ export class ContainerConfigError extends Error {
   }
 }
 
-/** Removed by the implementation PR; exists so the contract tests fail red. */
-export class ContainerNotImplementedError extends Error {
-  readonly code = "NOT_IMPLEMENTED";
-
-  constructor() {
-    super("createContainer is a contract stub");
-    this.name = "ContainerNotImplementedError";
-  }
-}
-
 /**
  * The single composition root (D3, §5). The order is part of the contract:
  * 1. refuse provider credential variables (S3), before reading anything else;
  * 2. validate the configuration with Zod;
  * 3. build the keyring from the master key;
  * 4. only then open the database.
- * `apps/api/src/main.ts` and `apps/worker/src/main.ts` are the only callers.
+ * The API and worker entrypoints are the only callers (§5 names them
+ * `main.ts`; today they are `apps/api/src/index.ts` and `apps/worker/src/index.ts`).
  */
 export async function createContainer(
-  _env: NodeJS.ProcessEnv,
+  env: NodeJS.ProcessEnv,
 ): Promise<Container> {
-  throw new ContainerNotImplementedError();
+  assertNoProviderKeys(env);
+  const parsed = containerEnvSchema.safeParse(env);
+  if (!parsed.success) {
+    const fields = parsed.error.issues.map((issue) => String(issue.path[0]));
+    throw new ContainerConfigError([...new Set(fields)]);
+  }
+  const keyring = keyringFromEnv(parsed.data);
+  // postgres.js connects lazily, on the first query.
+  const sql = postgres(parsed.data.DATABASE_URL);
+  let closing: Promise<void> | undefined;
+  const container = {
+    workspaceKeys: createWorkspaceKeyVault(sql, keyring),
+    close: () => {
+      closing ??= sql.end();
+      return closing;
+    },
+  };
+  // Non-enumerable, so JSON.stringify, spread and console.log never expose the
+  // master key or the database password (S2). The cast is safe: all three
+  // properties are defined here with exactly the declared types.
+  return Object.defineProperties(container, {
+    env: { value: parsed.data },
+    keyring: { value: keyring },
+    sql: { value: sql },
+  }) as Container;
 }
