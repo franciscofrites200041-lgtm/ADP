@@ -1,0 +1,2 @@
+ALTER TABLE "provider_credential" DROP CONSTRAINT "provider_credential_workspace_id_alias_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "provider_credential_workspace_id_alias_active_unique" ON "provider_credential" USING btree ("workspace_id","alias") WHERE archived_at IS NULL;

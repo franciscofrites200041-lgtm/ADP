@@ -6,7 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
-  unique,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -43,10 +43,10 @@ export const providerCredential = pgTable(
   },
   (table) => [
     index("provider_credential_workspace_id_idx").on(table.workspaceId),
-    unique("provider_credential_workspace_id_alias_unique").on(
-      table.workspaceId,
-      table.alias,
-    ),
+    // Archiving frees the alias: only active credentials compete for it.
+    uniqueIndex("provider_credential_workspace_id_alias_active_unique")
+      .on(table.workspaceId, table.alias)
+      .where(sql`archived_at IS NULL`),
     check(
       "provider_credential_base_url_only_openai_compatible",
       sql`base_url IS NULL OR provider_id = 'openai-compatible'`,

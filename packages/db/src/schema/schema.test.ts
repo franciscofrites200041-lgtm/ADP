@@ -1,7 +1,7 @@
-import { getTableConfig } from "drizzle-orm/pg-core";
+import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
-import { agentTemplate, productTables } from "./index.ts";
+import { agentTemplate, productTables, providerCredential } from "./index.ts";
 
 type ProductTable = (typeof productTables)[keyof typeof productTables];
 
@@ -50,8 +50,8 @@ const spec: Record<string, TableSpec> = {
       "created_by",
       "archived_at",
     ],
-    indexes: [["workspace_id"]],
-    uniques: [["workspace_id", "alias"]],
+    indexes: [["workspace_id"], ["workspace_id", "alias"]],
+    uniques: [],
     primaryKeys: [["id"]],
     checks: ["provider_credential_base_url_only_openai_compatible"],
     enumColumns: {
@@ -697,6 +697,20 @@ describe("product schema inventory (§7)", () => {
         [...(spec[name]?.checks ?? [])].sort(),
       );
     }
+  });
+
+  it("keeps a credential alias unique per workspace only while not archived", () => {
+    const aliasIndex = getTableConfig(providerCredential).indexes.find(
+      (index) =>
+        index.config.name ===
+        "provider_credential_workspace_id_alias_active_unique",
+    );
+    const where = aliasIndex?.config.where;
+
+    expect(aliasIndex?.config.unique).toBe(true);
+    expect(where && new PgDialect().sqlToQuery(where).sql).toBe(
+      "archived_at IS NULL",
+    );
   });
 
   it("keeps the global agent_template free of any workspace_id", () => {

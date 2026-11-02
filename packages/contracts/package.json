@@ -1,0 +1,21 @@
+{
+  "name": "@middleware/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "lint": "biome check .",
+    "test": "vitest run",
+    "build": "tsc --noEmit --project tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2"
+  },
+  "dependencies": {
+    "zod": "4.6.6"
+  }
+}
