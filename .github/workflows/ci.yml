@@ -51,6 +51,11 @@ jobs:
       - name: Create the disposable test database
         run: psql "postgres://middleware:middleware@127.0.0.1:5432/middleware" -f infra/postgres/init-test-database.sql
 
+      # §14: the migrations run once, before the suite. The adapters' tests use
+      # the real tables, not an empty database.
+      - name: Migrate the test database
+        run: pnpm --filter @middleware/db db:migrate:apply "$DATABASE_URL_TEST"
+
       # Unit tests, integration tests against the service database, lint and
       # typecheck. A missing DATABASE_URL_TEST fails on purpose (see
       # apps/api/src/integration-env.test.ts), so the security suites cannot
