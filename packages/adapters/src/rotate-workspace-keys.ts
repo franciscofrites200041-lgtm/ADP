@@ -9,7 +9,17 @@ export type StoredWorkspaceKey = { workspaceId: string } & WrappedDek;
 
 type WorkspaceKeyUpdate = StoredWorkspaceKey & { rotatedAt: Date };
 
-/** Persistence boundary for the KEK rotation command. */
+/**
+ * Persistence boundary for the master-key rotation.
+ *
+ * Deliberate exception to "every repository takes workspaceId first", granted by
+ * MIDDLEWARE_MASTER.md §8 (seguridad de claves): "Rotación: se agrega una versión
+ * nueva de KEK y se re-envuelven las DEK con un script
+ * (docs/runbooks/rotar-clave-maestra.md)". The authorised operation is a
+ * system-wide re-wrap of every workspace DEK, so the port cannot be scoped to
+ * one tenant and has no session to derive it from. It is unreachable from HTTP.
+ * The request-scoped repositories keep the workspaceId-first rule.
+ */
 export type WorkspaceKeyStore = {
   list: () => Promise<readonly StoredWorkspaceKey[]>;
   update: (

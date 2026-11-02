@@ -5,7 +5,7 @@ import { z } from "zod";
  * DATABASE_URL is read only by Drizzle Kit's configuration boundary. The URL
  * value is validated but never interpolated into an error or logged.
  */
-const databaseUrlSchema = z.string().url();
+const databaseUrlSchema = z.url({ protocol: /^postgres(ql)?$/ });
 
 const readDatabaseUrl = (): string => {
   const parsed = databaseUrlSchema.safeParse(process.env.DATABASE_URL);
