@@ -15,18 +15,18 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { createId } from "../id.js";
-import { agent, agentVersion } from "./agent.js";
-import { apiToken } from "./api-token.js";
-import { conversation } from "./conversation.js";
+import { createId } from "../id.ts";
+import { agent, agentVersion } from "./agent.ts";
+import { apiToken } from "./api-token.ts";
+import { conversation } from "./conversation.ts";
 import {
   approvalDecision,
   runStatus,
   runTrigger,
   scheduleTargetType,
   toolCallStatus,
-} from "./enums.js";
-import { agentGroup } from "./group.js";
+} from "./enums.ts";
+import { agentGroup } from "./group.ts";
 
 /**
  * A single agent execution, from input to final response. Child runs created

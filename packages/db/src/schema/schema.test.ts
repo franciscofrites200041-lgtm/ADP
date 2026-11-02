@@ -1,7 +1,7 @@
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
-import { agentTemplate, productTables } from "./index.js";
+import { agentTemplate, productTables } from "./index.ts";
 
 type ProductTable = (typeof productTables)[keyof typeof productTables];
 

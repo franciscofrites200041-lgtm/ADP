@@ -8,8 +8,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { createId } from "../id.js";
-import { apiToken } from "./api-token.js";
+import { createId } from "../id.ts";
+import { apiToken } from "./api-token.ts";
 
 /**
  * Immutable audit trail of credential, token, integration, channel and

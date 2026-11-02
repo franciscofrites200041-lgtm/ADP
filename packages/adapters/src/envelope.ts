@@ -5,7 +5,12 @@ const IV_BYTES = 12;
 const TAG_BYTES = 16;
 
 export class CryptoError extends Error {
-  readonly code: "INVALID_KEY" | "UNKNOWN_KEK_VERSION" | "DECRYPT_FAILED";
+  readonly code:
+    | "INVALID_KEY"
+    | "UNKNOWN_KEK_VERSION"
+    | "DECRYPT_FAILED"
+    | "WORKSPACE_KEY_NOT_FOUND"
+    | "WORKSPACE_KEY_CONFLICT";
 
   constructor(code: CryptoError["code"], message: string) {
     super(message);

@@ -12,8 +12,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { createId } from "../id.js";
-import { providerCredential } from "./credential.js";
+import { createId } from "../id.ts";
+import { providerCredential } from "./credential.ts";
 
 /** Global catalog of reusable agent templates, loaded by seed (WP-21). */
 export const agentTemplate = pgTable("agent_template", {

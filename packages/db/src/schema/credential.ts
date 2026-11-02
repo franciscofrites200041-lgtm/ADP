@@ -11,12 +11,12 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { createId } from "../id.js";
+import { createId } from "../id.ts";
 import {
   providerCredentialStatus,
   toolConnectionKind,
   toolConnectionMode,
-} from "./enums.js";
+} from "./enums.ts";
 
 /**
  * A provider API key, stored encrypted (AES-256-GCM with the workspace DEK).

@@ -1,7 +1,7 @@
 import { index, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
-import { createId } from "../id.js";
-import { agent } from "./agent.js";
+import { createId } from "../id.ts";
+import { agent } from "./agent.ts";
 
 /**
  * A first-party API token (`mw_live_…`). Only the SHA-256 hash and the visible

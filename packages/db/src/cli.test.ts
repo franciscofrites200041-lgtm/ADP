@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { main } from "./cli.js";
+import { main } from "./cli.ts";
 
 describe("cli", () => {
   it("requires an explicit DATABASE_URL argument", async () => {

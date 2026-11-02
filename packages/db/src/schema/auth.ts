@@ -98,6 +98,7 @@ export const organization = pgTable("organization", {
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
   logo: text("logo"),
+  metadata: text("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

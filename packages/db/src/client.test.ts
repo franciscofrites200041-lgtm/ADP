@@ -8,7 +8,7 @@ const { postgres, drizzle } = vi.hoisted(() => ({
 vi.mock("postgres", () => ({ default: postgres }));
 vi.mock("drizzle-orm/postgres-js", () => ({ drizzle }));
 
-import { createDbClient } from "./client.js";
+import { createDbClient } from "./client.ts";
 
 describe("createDbClient", () => {
   beforeEach(() => {

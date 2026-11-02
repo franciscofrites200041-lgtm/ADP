@@ -1,30 +1,30 @@
-export * from "./agent.js";
-export * from "./api-token.js";
-export * from "./audit.js";
-export * from "./auth.js";
-export * from "./conversation.js";
-export * from "./credential.js";
-export * from "./delivery.js";
-export * from "./enums.js";
-export * from "./group.js";
-export * from "./integration.js";
-export * from "./message.js";
-export * from "./run.js";
-export * from "./usage.js";
-export * from "./workspace.js";
+export * from "./agent.ts";
+export * from "./api-token.ts";
+export * from "./audit.ts";
+export * from "./auth.ts";
+export * from "./conversation.ts";
+export * from "./credential.ts";
+export * from "./delivery.ts";
+export * from "./enums.ts";
+export * from "./group.ts";
+export * from "./integration.ts";
+export * from "./message.ts";
+export * from "./run.ts";
+export * from "./usage.ts";
+export * from "./workspace.ts";
 
-import { agent, agentTemplate, agentVersion } from "./agent.js";
-import { apiToken } from "./api-token.js";
-import { auditLog } from "./audit.js";
-import { conversation } from "./conversation.js";
-import { providerCredential, toolConnection } from "./credential.js";
-import { delivery, deliveryChannel, deliveryTarget } from "./delivery.js";
-import { agentGroup, agentGroupMember } from "./group.js";
-import { integration } from "./integration.js";
-import { message } from "./message.js";
-import { approval, run, runEvent, schedule, toolCall } from "./run.js";
-import { spendLimit, usageRecord } from "./usage.js";
-import { workspaceKey } from "./workspace.js";
+import { agent, agentTemplate, agentVersion } from "./agent.ts";
+import { apiToken } from "./api-token.ts";
+import { auditLog } from "./audit.ts";
+import { conversation } from "./conversation.ts";
+import { providerCredential, toolConnection } from "./credential.ts";
+import { delivery, deliveryChannel, deliveryTarget } from "./delivery.ts";
+import { agentGroup, agentGroupMember } from "./group.ts";
+import { integration } from "./integration.ts";
+import { message } from "./message.ts";
+import { approval, run, runEvent, schedule, toolCall } from "./run.ts";
+import { spendLimit, usageRecord } from "./usage.ts";
+import { workspaceKey } from "./workspace.ts";
 
 /**
  * Every product-owned table from MIDDLEWARE_MASTER.md §7, keyed by camelCase
