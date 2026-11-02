@@ -1,6 +1,6 @@
 # ADR-0004: Use Claude for mandatory GGA pre-commit review
 
-- Status: Accepted (requested by the project owner on 2026-10-29; pending ratification by Luca)
+- Status: Accepted (requested 2026-10-29; ratified 2026-11-02 by Luca Salame, stated in the working session)
 - Date: 2026-10-29
 - Supersedes: ADR-0002
 
