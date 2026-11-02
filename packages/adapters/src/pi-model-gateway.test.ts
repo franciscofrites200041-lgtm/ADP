@@ -238,18 +238,19 @@ describe("createPiModelGateway", () => {
       expect(error.code).toBe(code);
     });
 
-    it("carries the §10 Spanish message instead of the provider's raw text", async () => {
+    it("keeps the provider's raw text out of the error (S2)", async () => {
       const { gateway, faux } = createFauxGateway();
       faux.setResponses([
         fauxAssistantMessage([], {
           stopReason: "error",
-          errorMessage: "401: Incorrect API key provided",
+          errorMessage: "401: Incorrect API key provided sk-live-123",
         }),
       ]);
       const error = await streamFailure(gateway, fauxTarget());
-      expect(error.message).toBe(
-        "La API key del proveedor no es válida o no está autorizada.",
-      );
+      expect(error.code).toBe("invalid_api_key");
+      // Only the code travels: no provider text, no key.
+      expect(error.message).toBe("invalid_api_key");
+      expect(String(error)).not.toContain("sk-live-123");
     });
 
     it("fails with model_not_found when the model is not in the catalog", async () => {

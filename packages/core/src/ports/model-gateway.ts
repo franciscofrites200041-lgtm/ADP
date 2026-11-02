@@ -53,7 +53,7 @@ export type ProviderStreamEvent =
 export class ProviderError extends Error {
   readonly code: ProviderErrorCode;
 
-  constructor(code: ProviderErrorCode, detail = code) {
+  constructor(code: ProviderErrorCode, detail: string = code) {
     super(detail);
     this.name = "ProviderError";
     this.code = code;

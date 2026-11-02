@@ -67,27 +67,6 @@ type MappedProviderErrorCode =
   | "content_filtered"
   | "unknown";
 
-/** Spanish messages for each mapped code (§10): all our own text, never the
- * provider's, so no secret can leak through an error detail (S2). */
-const PROVIDER_ERROR_MESSAGES: Readonly<
-  Record<MappedProviderErrorCode, string>
-> = {
-  invalid_api_key:
-    "La API key del proveedor no es válida o no está autorizada.",
-  insufficient_quota:
-    "El proveedor informa que no queda cuota o saldo disponible.",
-  rate_limited:
-    "El proveedor limitó los requests por tiempo; reintentá en unos segundos.",
-  model_not_found:
-    "El modelo no existe o no está disponible para este proveedor.",
-  context_too_long: "La conversación supera el contexto máximo del modelo.",
-  provider_timeout: "El proveedor tardó demasiado en responder.",
-  provider_unavailable: "El proveedor no está disponible en este momento.",
-  content_filtered:
-    "El proveedor bloqueó el contenido por su política de seguridad.",
-  unknown: "El proveedor devolvió un error inesperado.",
-};
-
 /**
  * First match wins, so a message is checked from most to least specific (a
  * 429 that says "quota" must beat the generic rate-limit line).
@@ -133,15 +112,13 @@ function mapProviderErrorCode(failure: string): MappedProviderErrorCode {
   return "unknown";
 }
 
+/**
+ * Only the code crosses this boundary; the Spanish text lives in the messages
+ * file of the layer that renders it, and never the provider's own message, so
+ * no secret can leak through an error detail (S2, WP-33).
+ */
 function providerError(code: MappedProviderErrorCode): ProviderError {
-  // The port narrows `detail` to the code union because its default is the
-  // code, but the constructor only forwards the string to `super`, so a §10
-  // Spanish message is safe here at runtime.
-  type ProviderErrorDetail = ConstructorParameters<typeof ProviderError>[1];
-  return new ProviderError(
-    code,
-    PROVIDER_ERROR_MESSAGES[code] as ProviderErrorDetail,
-  );
+  return new ProviderError(code);
 }
 
 function providerErrorFromFailure(failure: AssistantMessage): ProviderError {
