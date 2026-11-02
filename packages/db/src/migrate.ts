@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { migrate as drizzleMigrate } from "drizzle-orm/postgres-js/migrator";
 
-import { createDbClient } from "./client.js";
+import { createDbClient } from "./client.ts";
 
 /** Generated migration artifacts (`out` in drizzle.config.ts). */
 const defaultMigrationsFolder = fileURLToPath(

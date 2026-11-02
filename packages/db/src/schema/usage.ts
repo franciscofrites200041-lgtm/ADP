@@ -10,10 +10,10 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { createId } from "../id.js";
-import { agent } from "./agent.js";
-import { spendLimitAction, spendLimitScope } from "./enums.js";
-import { run } from "./run.js";
+import { createId } from "../id.ts";
+import { agent } from "./agent.ts";
+import { spendLimitAction, spendLimitScope } from "./enums.ts";
+import { run } from "./run.ts";
 
 /**
  * Tokens and cost of one assistant message. The cost comes from pi-ai's

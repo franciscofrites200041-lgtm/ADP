@@ -1,4 +1,4 @@
-import type { DbClient } from "./client.js";
+import type { DbClient } from "./client.ts";
 
 /**
  * A single idempotent seed write. Re-running a step must never duplicate

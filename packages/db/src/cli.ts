@@ -1,8 +1,8 @@
 import { pathToFileURL } from "node:url";
 
-import { createDbClient } from "./client.js";
-import { runMigrations } from "./migrate.js";
-import { seed } from "./seed.js";
+import { createDbClient } from "./client.ts";
+import { runMigrations } from "./migrate.ts";
+import { seed } from "./seed.ts";
 
 /**
  * Thin CLI over the db runtime. The database URL is an explicit positional

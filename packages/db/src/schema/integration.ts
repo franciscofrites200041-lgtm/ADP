@@ -7,8 +7,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { createId } from "../id.js";
-import { integrationProvider, integrationStatus } from "./enums.js";
+import { createId } from "../id.ts";
+import { integrationProvider, integrationStatus } from "./enums.ts";
 
 /**
  * An external OAuth account connected to the workspace (MVP: Google). The

@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import type { DbClient } from "./client.js";
-import { type Pingable, ping } from "./ping.js";
+import type { DbClient } from "./client.ts";
+import { type Pingable, ping } from "./ping.ts";
 
 describe("ping", () => {
   it("accepts the typed client where a Pingable is expected", () => {

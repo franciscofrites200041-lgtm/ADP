@@ -13,9 +13,9 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { createId } from "../id.js";
-import { agent } from "./agent.js";
-import { agentGroupMode } from "./enums.js";
+import { createId } from "../id.ts";
+import { agent } from "./agent.ts";
+import { agentGroupMode } from "./enums.ts";
 
 /**
  * A group of agents coordinated by a single coordinator agent. The

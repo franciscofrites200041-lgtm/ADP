@@ -1,9 +1,9 @@
 import { index, jsonb, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
 
-import { createId } from "../id.js";
-import { conversation } from "./conversation.js";
-import { messageRole } from "./enums.js";
-import { run } from "./run.js";
+import { createId } from "../id.ts";
+import { conversation } from "./conversation.ts";
+import { messageRole } from "./enums.ts";
+import { run } from "./run.ts";
 
 /**
  * A message in a conversation, persisted in the pi-ai message format.
