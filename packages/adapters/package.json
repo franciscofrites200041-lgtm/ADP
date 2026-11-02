@@ -17,6 +17,9 @@
     "@types/node": "24.19.2"
   },
   "dependencies": {
+    "@middleware/core": "workspace:*",
+    "@middleware/db": "workspace:*",
+    "drizzle-orm": "0.45.1",
     "postgres": "3.4.7",
     "zod": "4.6.6"
   }
