@@ -48,6 +48,7 @@ const app = createApp({
   ready: () => ping(dbClient),
   auth,
   credentials,
+  allowedOrigins: [BETTER_AUTH_URL],
   logger,
 });
 

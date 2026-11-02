@@ -12,6 +12,7 @@ const statusByCode: Record<ErrorCode, ContentfulStatusCode> = {
   unauthorized: 401,
   not_found: 404,
   alias_taken: 409,
+  forbidden: 403,
   unknown: 500,
 };
 

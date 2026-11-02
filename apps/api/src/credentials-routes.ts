@@ -7,6 +7,7 @@ import {
 import type { CredentialService } from "@middleware/core";
 import { type Context, Hono } from "hono";
 
+import { requireOrigin } from "./origin.ts";
 import {
   requireWorkspace,
   type SessionReader,
@@ -68,18 +69,21 @@ function credentialHandlers(credentials: CredentialService) {
 export function credentialRoutes(
   auth: SessionReader,
   credentials: CredentialService,
+  allowedOrigins: readonly string[],
 ): Hono<WorkspaceEnv> {
   const app = new Hono<WorkspaceEnv>();
   const session = requireWorkspace(auth);
+  // S10: writes check the origin; reads do not.
+  const write = requireOrigin(allowedOrigins);
   const handle = credentialHandlers(credentials);
 
   app.get("/api/providers", session, (c) =>
     c.json({ providers: providerCatalog }),
   );
   app.get("/api/credentials", session, handle.list);
-  app.post("/api/credentials", session, handle.create);
-  app.patch("/api/credentials/:id", session, handle.rename);
-  app.delete("/api/credentials/:id", session, handle.archive);
+  app.post("/api/credentials", session, write, handle.create);
+  app.patch("/api/credentials/:id", session, write, handle.rename);
+  app.delete("/api/credentials/:id", session, write, handle.archive);
 
   return app;
 }

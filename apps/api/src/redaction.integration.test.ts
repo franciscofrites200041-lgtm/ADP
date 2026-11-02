@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createLogger } from "./logger.ts";
 import {
   createIntegrationHarness,
+  TEST_ORIGIN,
   type TestSession,
   testDatabaseUrl,
 } from "./testing/integration-harness.ts";
@@ -55,7 +56,11 @@ describe.skipIf(!url)("key redaction against postgres", () => {
   const call = async (method: string, path: string, body?: unknown) => {
     const res = await harness.app.request(path, {
       method,
-      headers: { "content-type": "application/json", cookie: ana.cookie },
+      headers: {
+        "content-type": "application/json",
+        cookie: ana.cookie,
+        origin: TEST_ORIGIN,
+      },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     responses.push(await res.text());
