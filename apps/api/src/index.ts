@@ -1,11 +1,20 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { serve } from "@hono/node-server";
-import { createContainer } from "@middleware/adapters";
+import {
+  createAuditLogRepo,
+  createContainer,
+  createCredentialRepo,
+  createCredentialSecretVault,
+  createSystemClock,
+  createUuidV7IdGen,
+} from "@middleware/adapters";
+import { createCredentialService } from "@middleware/core";
 import { createDbClient, ping } from "@middleware/db";
 
 import { createApp } from "./app.ts";
 import { createAuth } from "./auth.ts";
 import { readEnv } from "./env.ts";
+import { createLogger } from "./logger.ts";
 import { createSmtpMailer } from "./mailer.ts";
 
 const port = 3001;
@@ -24,8 +33,24 @@ const auth = createAuth({
   baseURL: BETTER_AUTH_URL,
   mailer: createSmtpMailer(SMTP_URL, MAIL_FROM),
 });
-const app = createApp({ ready: () => ping(dbClient), auth });
+const credentials = createCredentialService({
+  credentialRepo: createCredentialRepo(dbClient),
+  secretVault: createCredentialSecretVault(
+    container.sql,
+    container.workspaceKeys,
+  ),
+  auditLog: createAuditLogRepo(dbClient),
+  clock: createSystemClock(),
+  idGen: createUuidV7IdGen(),
+});
+const logger = createLogger();
+const app = createApp({
+  ready: () => ping(dbClient),
+  auth,
+  credentials,
+  logger,
+});
 
 serve({ fetch: app.fetch, port }, () => {
-  console.log(`[api] listening on port ${port}`);
+  logger.info(`[api] listening on port ${port}`);
 });
