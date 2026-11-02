@@ -68,3 +68,11 @@ jobs:
 
       - name: Build the web app
         run: pnpm --filter @middleware/web build
+
+      # The boundaries a diff cannot show: core cannot reach the adapters, the
+      # web cannot reach the database. See docs/ci.md.
+      - name: Architecture
+        run: pnpm arch
+
+      - name: Unused code and dependencies
+        run: pnpm knip

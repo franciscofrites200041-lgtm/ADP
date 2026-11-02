@@ -7,20 +7,28 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "typecheck": "turbo run typecheck",
+    "arch": "depcruise apps packages --config .dependency-cruiser.cjs",
+    "build": "turbo run build",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm arch && pnpm knip",
+    "dev": "turbo run dev",
+    "infra:down": "docker compose -f infra/compose.dev.yaml down",
+    "infra:up": "docker compose -f infra/compose.dev.yaml up -d",
+    "knip": "knip",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "build": "turbo run build",
-    "dev": "turbo run dev",
-    "infra:up": "docker compose -f infra/compose.dev.yaml up -d",
-    "infra:down": "docker compose -f infra/compose.dev.yaml down",
-    "check": "pnpm typecheck && pnpm lint && pnpm test"
+    "typecheck": "turbo run typecheck",
+    "types:strict": "type-coverage --at-least 100 --strict"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@biomejs/biome": "2.5.15",
     "@playwright/test": "1.64.0",
+    "@swc/core": "^1.16.21",
+    "dependency-cruiser": "^18.7.1",
+    "knip": "^6.44.1",
     "postgres": "3.4.7",
     "turbo": "2.11.7",
+    "type-coverage": "^2.31.1",
     "typescript": "7.0.2",
     "vitest": "5.0.3",
     "zod": "4.6.7"

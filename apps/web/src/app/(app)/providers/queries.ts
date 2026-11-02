@@ -62,7 +62,7 @@ const withJson = (init: RequestInit): RequestInit => {
 };
 
 /** Every error the screen can show, with a message that is already Spanish. */
-export class ClientError extends Error {
+class ClientError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ClientError";

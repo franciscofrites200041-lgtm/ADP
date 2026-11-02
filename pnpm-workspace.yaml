@@ -1,6 +1,8 @@
 packages:
   - "apps/*"
   - "packages/*"
+overrides:
+  "type-coverage-core>typescript": "npm:@typescript/typescript6@^6"
 allowBuilds:
   esbuild: true
   "@google/genai": true

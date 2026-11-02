@@ -5,7 +5,7 @@ import { z } from "zod";
  * this URL from Server Components; a malformed value fails on the first
  * request instead of looking like "every user is signed out".
  */
-export const webEnvSchema = z.object({
+const webEnvSchema = z.object({
   // http(s) only: this string is passed to `fetch`, so another scheme is a bug.
   API_INTERNAL_URL: z
     .url({ protocol: /^https?$/ })

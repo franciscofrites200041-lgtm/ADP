@@ -7,7 +7,7 @@ import {
 
 export type StoredWorkspaceKey = { workspaceId: string } & WrappedDek;
 
-export type WorkspaceKeyUpdate = StoredWorkspaceKey & { rotatedAt: Date };
+type WorkspaceKeyUpdate = StoredWorkspaceKey & { rotatedAt: Date };
 
 /** Persistence boundary for the KEK rotation command. */
 export type WorkspaceKeyStore = {

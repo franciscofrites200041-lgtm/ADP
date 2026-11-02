@@ -1,7 +1,7 @@
 import type { Logger } from "pino";
 
 /** What the handler needs from the HTTP server. */
-export type ClosableServer = { close(callback: (error?: Error) => void): void };
+type ClosableServer = { close(callback: (error?: Error) => void): void };
 
 export type ShutdownDeps = {
   server: ClosableServer;
