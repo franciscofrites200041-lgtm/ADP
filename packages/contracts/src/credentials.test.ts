@@ -5,6 +5,7 @@ import {
   credentialIdParamSchema,
   credentialListResponseSchema,
   credentialResponseSchema,
+  credentialTestResponseSchema,
   renameCredentialRequestSchema,
 } from "./credentials.ts";
 import { errorBodySchema } from "./errors.ts";
@@ -165,6 +166,47 @@ describe("error body", () => {
     expect(
       errorBodySchema.safeParse({ error: { code: "boom", message: "x" } })
         .success,
+    ).toBe(false);
+  });
+});
+
+describe("credentialTestResponseSchema", () => {
+  it("accepts a valid probe with no failure code", () => {
+    const body = { status: "valid", code: null };
+    expect(credentialTestResponseSchema.parse(body)).toEqual(body);
+  });
+
+  it("accepts an invalid probe with a known reason", () => {
+    const body = { status: "invalid", code: "invalid_key" };
+    expect(credentialTestResponseSchema.parse(body)).toEqual(body);
+  });
+
+  it("rejects a status without its matching code", () => {
+    expect(
+      credentialTestResponseSchema.safeParse({
+        status: "valid",
+        code: "rate_limited",
+      }).success,
+    ).toBe(false);
+    expect(
+      credentialTestResponseSchema.safeParse({ status: "invalid", code: null })
+        .success,
+    ).toBe(false);
+  });
+
+  it("rejects an unknown failure code and extra keys", () => {
+    expect(
+      credentialTestResponseSchema.safeParse({
+        status: "invalid",
+        code: "boom",
+      }).success,
+    ).toBe(false);
+    expect(
+      credentialTestResponseSchema.safeParse({
+        status: "valid",
+        code: null,
+        message: "el contrato no transporta texto de UI",
+      }).success,
     ).toBe(false);
   });
 });
