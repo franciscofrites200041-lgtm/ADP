@@ -89,3 +89,27 @@ ningún secreto en logs, eventos, errores ni respuestas; GGA pasa en cada commit
 - **L12** (Q7 sigue abierta): las seis plantillas están escritas con contenido
   razonable en español rioplatense, pero el texto final es decisión de producto
   (responsable Ale, §16 del maestro).
+
+- **L13** (WP-21 cerrado): `b75d8df`. Seis rondas de GGA. La última destapó un bug
+  de pérdida de datos: editar un agente mandaba `params: {}` y `tools: []` porque en
+  modo edición no hay plantilla, así que cada edición borraba los parámetros y las
+  herramientas del agente. Corregido y fijado con dos tests de regresión (editar
+  conserva ambos; una plantilla inexistente se rechaza sin escribir nada).
+- **L14** (estado del alcance): WP-12, WP-13, WP-20 y WP-21 cerrados y en `main`.
+  Pendiente quedó: Q7 (contenido final de las plantillas, decisión de Ale), WP-14
+  (cliente SSRF, *Could*), la verificación en navegador de la pantalla de agentes, y
+  los advisories de GGA sobre código previo.
+
+- **L15** (verificación en navegador, 2026-11-02): al probar la pantalla aparecieron
+  tres fallas apiladas. (1) El front se servía con `next start` sobre un build
+  anterior a WP-21, así que el formulario nuevo no llegaba al navegador. (2) En esta
+  máquina `next dev` (Turbopack, Next 16.4.3) no hidrata: la página hace cero pedidos
+  a `/api` y `hydrated: false`, sin errores de consola. (3) Bug real en `main`:
+  `agent-form.tsx` anidaba un `<input>` dentro de `Field`, que ya renderiza el suyo;
+  React error 137 tiraba la página entera al error boundary.
+  Corregido en `2b47ac1` con `agents-screen.test.tsx` como regresión, y verificado con
+  clics reales: 3 credenciales ofrecidas, 4 modelos, alta confirmada por la lista y
+  por la API.
+- **L16** (deuda detectada acá): ningún control automático abría la página, por eso los
+  tres problemas llegaron hasta el navegador. Falta un smoke de Playwright en CI que
+  cargue las rutas principales y falle si la página cae al error boundary.
