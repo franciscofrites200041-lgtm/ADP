@@ -1,4 +1,4 @@
-import type { CredentialService } from "@middleware/core";
+import type { CredentialService, ModelService } from "@middleware/core";
 import { Hono } from "hono";
 import type { Logger } from "pino";
 
@@ -17,6 +17,8 @@ export interface CreateAppOptions {
   auth?: Auth;
   /** Credential use cases; mounted only together with `auth`. */
   credentials?: CredentialService;
+  /** Model discovery (WP-13); mounted with `credentials`. */
+  models?: ModelService;
   /** Origins allowed to write; defaults to none, which rejects every write. */
   allowedOrigins?: readonly string[];
   logger?: Logger;
@@ -31,6 +33,7 @@ export function createApp({
   ready,
   auth,
   credentials,
+  models,
   allowedOrigins = [],
   logger = createLogger(),
 }: CreateAppOptions): Hono {
@@ -54,7 +57,10 @@ export function createApp({
     app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
     app.route("/", meRoutes(auth));
     if (credentials) {
-      app.route("/", credentialRoutes(auth, credentials, allowedOrigins));
+      app.route(
+        "/",
+        credentialRoutes(auth, credentials, allowedOrigins, models),
+      );
     }
   }
 

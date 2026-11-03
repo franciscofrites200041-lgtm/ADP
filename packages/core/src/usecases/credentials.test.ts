@@ -158,7 +158,18 @@ describe("audit log (S2)", () => {
 });
 
 describe("testCredential", () => {
-  function setupWith(result: { status: "valid" } | { status: "invalid"; code: "invalid_key" | "provider_unreachable" | "rate_limited" | "provider_error" }) {
+  function setupWith(
+    result:
+      | { status: "valid" }
+      | {
+          status: "invalid";
+          code:
+            | "invalid_key"
+            | "provider_unreachable"
+            | "rate_limited"
+            | "provider_error";
+        },
+  ) {
     const ports = createInMemoryPorts();
     const probed: { apiKey: string; providerId: string }[] = [];
     ports.deps.credentialProbe = {
@@ -184,11 +195,7 @@ describe("testCredential", () => {
       request("Personal"),
     );
 
-    const outcome = await service.testCredential(
-      workspaceA,
-      userA,
-      created.id,
-    );
+    const outcome = await service.testCredential(workspaceA, userA, created.id);
 
     expect(outcome).toEqual({ status: "valid", code: null });
     expect(probed).toEqual([{ apiKey, providerId: "openai" }]);
@@ -209,11 +216,7 @@ describe("testCredential", () => {
       request("Personal"),
     );
 
-    const outcome = await service.testCredential(
-      workspaceA,
-      userA,
-      created.id,
-    );
+    const outcome = await service.testCredential(workspaceA, userA, created.id);
 
     expect(outcome).toEqual({ status: "invalid", code: "invalid_key" });
     const stored = rows[0];

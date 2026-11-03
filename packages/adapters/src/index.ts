@@ -4,6 +4,7 @@ export * from "./credential-probe.ts";
 export * from "./credential-repo.ts";
 export * from "./credential-secret-vault.ts";
 export * from "./envelope.ts";
+export * from "./model-cache.ts";
 export * from "./pi-model-gateway.ts";
 export * from "./provider-env.ts";
 export * from "./system-ports.ts";

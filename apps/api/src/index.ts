@@ -6,10 +6,12 @@ import {
   createCredentialRepo,
   createCredentialSecretVault,
   createHttpCredentialProbe,
+  createInMemoryModelCache,
+  createPiModelGateway,
   createSystemClock,
   createUuidV7IdGen,
 } from "@middleware/adapters";
-import { createCredentialService } from "@middleware/core";
+import { createCredentialService, createModelService } from "@middleware/core";
 import { createDbClient, ping } from "@middleware/db";
 
 import { createApp } from "./app.ts";
@@ -50,11 +52,22 @@ const credentials = createCredentialService({
   clock: createSystemClock(),
   idGen: createUuidV7IdGen(),
 });
+const models = createModelService({
+  credentialRepo: createCredentialRepo(dbClient),
+  secretVault: createCredentialSecretVault(
+    container.sql,
+    container.workspaceKeys,
+  ),
+  modelGateway: createPiModelGateway(),
+  modelCache: createInMemoryModelCache(),
+  clock: createSystemClock(),
+});
 const logger = createLogger();
 const app = createApp({
   ready: () => ping(dbClient),
   auth,
   credentials,
+  models,
   allowedOrigins: [BETTER_AUTH_URL],
   logger,
 });

@@ -1,6 +1,7 @@
 import {
   credentialListResponseSchema,
   credentialResponseSchema,
+  modelListResponseSchema,
   providerCatalog,
 } from "@middleware/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -177,6 +178,22 @@ describe.skipIf(!url)("credential routes against postgres", () => {
       });
       expect(await list(ana)).toContainEqual(
         expect.objectContaining({ id: rejected.id, status: "invalid" }),
+      );
+    });
+
+    it("discovers models only for its own workspace credential", async () => {
+      const mine = await create(ana, "ana-models");
+
+      const own = await call(ana, "GET", `/api/credentials/${mine.id}/models`);
+      expect(own.status).toBe(200);
+      const listed = modelListResponseSchema.parse(await own.json());
+      expect(listed.models.length).toBeGreaterThan(0);
+      expect(listed.models[0]?.providerId).toBe("openai");
+
+      await expectError(
+        await call(beto, "GET", `/api/credentials/${mine.id}/models`),
+        404,
+        "not_found",
       );
     });
 

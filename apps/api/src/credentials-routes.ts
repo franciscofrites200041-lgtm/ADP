@@ -4,7 +4,7 @@ import {
   providerCatalog,
   renameCredentialRequestSchema,
 } from "@middleware/contracts";
-import type { CredentialService } from "@middleware/core";
+import type { CredentialService, ModelService } from "@middleware/core";
 import { type Context, Hono } from "hono";
 
 import { requireOrigin } from "./origin.ts";
@@ -78,6 +78,7 @@ export function credentialRoutes(
   auth: SessionReader,
   credentials: CredentialService,
   allowedOrigins: readonly string[],
+  models?: ModelService,
 ): Hono<WorkspaceEnv> {
   const app = new Hono<WorkspaceEnv>();
   const session = requireWorkspace(auth);
@@ -93,6 +94,14 @@ export function credentialRoutes(
   app.patch("/api/credentials/:id", session, write, handle.rename);
   app.delete("/api/credentials/:id", session, write, handle.archive);
   app.post("/api/credentials/:id/test", session, write, handle.test);
+  if (models) {
+    // Discovery is a read (GET): no origin check, same as the list route.
+    app.get("/api/credentials/:id/models", session, async (c) =>
+      c.json({
+        models: await models.listModels(c.get("workspaceId"), idOf(c)),
+      }),
+    );
+  }
 
   return app;
 }

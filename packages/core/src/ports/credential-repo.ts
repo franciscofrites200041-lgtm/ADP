@@ -17,10 +17,7 @@ export type CredentialRepo = {
    * The same row with its sealed secret, for the only operation that needs the
    * plaintext: probing the credential. Callers must open it through the vault.
    */
-  findSealed(
-    workspaceId: string,
-    id: string,
-  ): Promise<StoredCredential | null>;
+  findSealed(workspaceId: string, id: string): Promise<StoredCredential | null>;
   /** Records the outcome of a connection test (WP-12). */
   setStatus(
     workspaceId: string,

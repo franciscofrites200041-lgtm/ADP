@@ -5,6 +5,8 @@ export type * from "./ports/clock.ts";
 export type * from "./ports/credential-probe.ts";
 export type * from "./ports/credential-repo.ts";
 export type * from "./ports/id-gen.ts";
+export type * from "./ports/model-cache.ts";
 export * from "./ports/model-gateway.ts";
 export type * from "./ports/secret-vault.ts";
 export * from "./usecases/credentials.ts";
+export * from "./usecases/models.ts";

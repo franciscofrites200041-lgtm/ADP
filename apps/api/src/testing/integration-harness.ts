@@ -6,12 +6,15 @@ import {
   createCredentialRepo,
   createCredentialSecretVault,
   createHttpCredentialProbe,
+  createInMemoryModelCache,
+  createPiModelGateway,
   createSystemClock,
   createUuidV7IdGen,
 } from "@middleware/adapters";
 import {
   type CredentialProbe,
   createCredentialService,
+  createModelService,
   type IdGen,
 } from "@middleware/core";
 import { createDbClient, runMigrations } from "@middleware/db";
@@ -70,7 +73,13 @@ async function composeApp(
   url: string,
   logger: Logger,
   idGen: IdGen,
-  credentialProbe: CredentialProbe = createHttpCredentialProbe(),
+  credentialProbe: CredentialProbe = {
+    // Deterministic and offline: a test that cares about the outcome injects
+    // its own probe, and no suite ever reaches a real provider (§14).
+    async probe() {
+      return { status: "invalid", code: "provider_error" };
+    },
+  },
 ) {
   await runMigrations(url);
   const container = await createContainer({
@@ -98,10 +107,22 @@ async function composeApp(
     clock: createSystemClock(),
     idGen,
   });
+  const models = createModelService({
+    credentialRepo: createCredentialRepo(db),
+    secretVault: createCredentialSecretVault(
+      container.sql,
+      container.workspaceKeys,
+    ),
+    // pi-ai answers from its catalog without network access.
+    modelGateway: createPiModelGateway(),
+    modelCache: createInMemoryModelCache(),
+    clock: createSystemClock(),
+  });
   const app = createApp({
     ready: async () => true,
     auth,
     credentials,
+    models,
     allowedOrigins: [TEST_ORIGIN],
     logger,
   });
