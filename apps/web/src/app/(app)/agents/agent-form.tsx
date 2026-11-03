@@ -92,16 +92,16 @@ export function AgentForm({ credentials, agent, template, onDone }: FormProps) {
             : t("formTitle")}
       </p>
       <form className="space-y-3" onSubmit={submit}>
-        <Field label={t("name")} hint={t("nameHint")}>
-          <input
-            className="min-h-11 w-full rounded-field bg-surface-2 px-3 text-body text-ink"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </Field>
-        <Field label={t("credential")} hint={t("credentialHint")}>
+        <Field
+          label={t("name")}
+          hint={t("nameHint")}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <label className="block text-small font-medium text-ink-2">
+          {t("credential")}
           <select
-            className="min-h-11 w-full rounded-field bg-surface-2 px-3 text-body text-ink"
+            className="mt-2 min-h-11 w-full rounded-field bg-raised px-4 text-body text-ink shadow-raised"
             value={credentialId}
             onChange={(event) => {
               setCredentialId(event.target.value);
@@ -115,10 +115,14 @@ export function AgentForm({ credentials, agent, template, onDone }: FormProps) {
               </option>
             ))}
           </select>
-        </Field>
-        <Field label={t("model")} hint={t("modelHint")}>
+          <span className="mt-1 block text-small text-muted">
+            {t("credentialHint")}
+          </span>
+        </label>
+        <label className="block text-small font-medium text-ink-2">
+          {t("model")}
           <select
-            className="min-h-11 w-full rounded-field bg-surface-2 px-3 text-body text-ink"
+            className="mt-2 min-h-11 w-full rounded-field bg-raised px-4 text-body text-ink shadow-raised"
             value={modelId}
             onChange={(event) => setModelId(event.target.value)}
           >
@@ -131,14 +135,21 @@ export function AgentForm({ credentials, agent, template, onDone }: FormProps) {
               </option>
             ))}
           </select>
-        </Field>
-        <Field label={t("instructions")} hint={t("instructionsHint")}>
+          <span className="mt-1 block text-small text-muted">
+            {t("modelHint")}
+          </span>
+        </label>
+        <label className="block text-small font-medium text-ink-2">
+          {t("instructions")}
           <textarea
-            className="min-h-32 w-full rounded-field bg-surface-2 px-3 py-2 text-body text-ink"
+            className="mt-2 min-h-32 w-full rounded-field bg-raised px-4 py-2 text-body text-ink shadow-raised"
             value={instructions}
             onChange={(event) => setInstructions(event.target.value)}
           />
-        </Field>
+          <span className="mt-1 block text-small text-muted">
+            {t("instructionsHint")}
+          </span>
+        </label>
         <button
           type="submit"
           disabled={!canSubmit}
