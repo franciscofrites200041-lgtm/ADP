@@ -9,9 +9,14 @@ import {
   createSystemClock,
   createUuidV7IdGen,
 } from "@middleware/adapters";
-import { createCredentialService, type IdGen } from "@middleware/core";
+import {
+  type CredentialProbe,
+  createCredentialService,
+  type IdGen,
+} from "@middleware/core";
 import { createDbClient, runMigrations } from "@middleware/db";
 import type { Logger } from "pino";
+import { z } from "zod";
 
 import { createApp } from "../app.ts";
 import { type Auth, createAuth } from "../auth.ts";
@@ -25,18 +30,30 @@ class TestSessionError extends Error {
   readonly code = "TEST_SESSION_FAILED";
 }
 
-/** Opt-in: `DATABASE_URL_TEST`, and only the disposable database. */
+/**
+ * Opt-in: `DATABASE_URL_TEST`, and only the disposable database. Validated at
+ * the boundary like every other environment input (Zod), so a missing or unsafe
+ * value is one decision in one place.
+ */
+const testDatabaseUrlSchema = z.url({ protocol: /^postgres(ql)?$/ }).refine(
+  (value) => {
+    const parsed = new URL(value);
+    const isLoopback = parsed.hostname === "127.0.0.1";
+    return isLoopback && parsed.pathname === "/middleware_test";
+  },
+  { message: "Refusing to run against a non-disposable database" },
+);
+
 export function testDatabaseUrl(): string | undefined {
-  const url = process.env.DATABASE_URL_TEST;
-  if (url) {
-    const u = new URL(url);
-    if (u.hostname !== "127.0.0.1" || u.pathname !== "/middleware_test") {
-      throw new UnsafeTestDatabaseError(
-        "Refusing to run against a non-disposable database",
-      );
-    }
+  const raw = process.env.DATABASE_URL_TEST;
+  if (raw === undefined || raw.trim() === "") return undefined;
+  const parsed = testDatabaseUrlSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new UnsafeTestDatabaseError(
+      "Refusing to run against a non-disposable database",
+    );
   }
-  return url;
+  return parsed.data;
 }
 
 /** The web origin the harness impersonates; requests must send it (S10). */
@@ -49,7 +66,12 @@ export type TestSession = {
 };
 
 /** The real app over the disposable database, composed like `index.ts`. */
-async function composeApp(url: string, logger: Logger, idGen: IdGen) {
+async function composeApp(
+  url: string,
+  logger: Logger,
+  idGen: IdGen,
+  credentialProbe: CredentialProbe = createHttpCredentialProbe(),
+) {
   await runMigrations(url);
   const container = await createContainer({
     DATABASE_URL: url,
@@ -67,7 +89,7 @@ async function composeApp(url: string, logger: Logger, idGen: IdGen) {
     credentialRepo: createCredentialRepo(db),
     // Real probe by default; a test that needs a deterministic answer injects
     // its own through the same seam the container uses.
-    credentialProbe: createHttpCredentialProbe(),
+    credentialProbe,
     secretVault: createCredentialSecretVault(
       container.sql,
       container.workspaceKeys,
@@ -127,8 +149,14 @@ export async function createIntegrationHarness(
   url: string,
   logger: Logger = createLogger(),
   idGen: IdGen = createUuidV7IdGen(),
+  credentialProbe?: CredentialProbe,
 ) {
-  const { app, auth, sql, close: end } = await composeApp(url, logger, idGen);
+  const {
+    app,
+    auth,
+    sql,
+    close: end,
+  } = await composeApp(url, logger, idGen, credentialProbe);
   const emails: string[] = [];
   const workspaceIds: string[] = [];
 

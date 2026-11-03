@@ -22,7 +22,15 @@ describe.skipIf(!url)("credential routes against postgres", () => {
   let beto: TestSession;
 
   beforeAll(async () => {
-    harness = await createIntegrationHarness(url ?? "");
+    harness = await createIntegrationHarness(url ?? "", undefined, undefined, {
+      // Deterministic stand-in for the provider: the probe itself is unit-tested
+      // against a fake HTTP server; here we test routing, auth and tenancy.
+      async probe({ apiKey }) {
+        return apiKey.includes("bad")
+          ? { status: "invalid", code: "invalid_key" }
+          : { status: "valid" };
+      },
+    });
     ana = await harness.signUp("Ana");
     beto = await harness.signUp("Beto");
   }, 30_000);
@@ -137,6 +145,39 @@ describe.skipIf(!url)("credential routes against postgres", () => {
       );
       await expectError(await call(beto, "DELETE", path), 404, "not_found");
       expect(await list(ana)).toContainEqual(credential);
+    });
+
+    it("tests only its own workspace credential", async () => {
+      const mine = await create(ana, "ana-probe");
+
+      const own = await call(ana, "POST", `/api/credentials/${mine.id}/test`);
+      expect(own.status).toBe(200);
+      expect(await own.json()).toEqual({ status: "valid", code: null });
+
+      await expectError(
+        await call(beto, "POST", `/api/credentials/${mine.id}/test`),
+        404,
+        "not_found",
+      );
+    });
+
+    it("records a rejected key as invalid with its reason", async () => {
+      const rejected = await create(ana, "bad-key");
+
+      const res = await call(
+        ana,
+        "POST",
+        `/api/credentials/${rejected.id}/test`,
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        status: "invalid",
+        code: "invalid_key",
+      });
+      expect(await list(ana)).toContainEqual(
+        expect.objectContaining({ id: rejected.id, status: "invalid" }),
+      );
     });
 
     it("ignores a workspace id sent in the query or the body", async () => {

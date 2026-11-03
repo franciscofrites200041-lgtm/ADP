@@ -50,6 +50,14 @@ function credentialHandlers(credentials: CredentialService) {
         ),
       );
     },
+    test: async (c) =>
+      c.json(
+        await credentials.testCredential(
+          c.get("workspaceId"),
+          c.get("userId"),
+          idOf(c),
+        ),
+      ),
     archive: async (c) => {
       const id = idOf(c);
       await credentials.archiveCredential(
@@ -84,6 +92,7 @@ export function credentialRoutes(
   app.post("/api/credentials", session, write, handle.create);
   app.patch("/api/credentials/:id", session, write, handle.rename);
   app.delete("/api/credentials/:id", session, write, handle.archive);
+  app.post("/api/credentials/:id/test", session, write, handle.test);
 
   return app;
 }
