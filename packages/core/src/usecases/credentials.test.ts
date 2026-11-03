@@ -156,3 +156,90 @@ describe("audit log (S2)", () => {
     expect(JSON.stringify(auditEntries)).not.toContain(apiKey);
   });
 });
+
+describe("testCredential", () => {
+  function setupWith(result: { status: "valid" } | { status: "invalid"; code: "invalid_key" | "provider_unreachable" | "rate_limited" | "provider_error" }) {
+    const ports = createInMemoryPorts();
+    const probed: { apiKey: string; providerId: string }[] = [];
+    ports.deps.credentialProbe = {
+      async probe(target) {
+        probed.push({ apiKey: target.apiKey, providerId: target.providerId });
+        return result;
+      },
+    };
+    return {
+      ...ports,
+      probed,
+      service: createCredentialService(ports.deps),
+    };
+  }
+
+  it("marks a working key valid and records it without the secret", async () => {
+    const { service, rows, auditEntries, probed } = setupWith({
+      status: "valid",
+    });
+    const created = await service.createCredential(
+      workspaceA,
+      userA,
+      request("Personal"),
+    );
+
+    const outcome = await service.testCredential(
+      workspaceA,
+      userA,
+      created.id,
+    );
+
+    expect(outcome).toEqual({ status: "valid", code: null });
+    expect(probed).toEqual([{ apiKey, providerId: "openai" }]);
+    const stored = rows[0];
+    if (!stored) throw new Error("credential was not stored");
+    expect(stored.status).toBe("valid");
+    expect(JSON.stringify(auditEntries)).not.toContain(apiKey);
+  });
+
+  it("marks a rejected key invalid and keeps the reason", async () => {
+    const { service, rows } = setupWith({
+      status: "invalid",
+      code: "invalid_key",
+    });
+    const created = await service.createCredential(
+      workspaceA,
+      userA,
+      request("Personal"),
+    );
+
+    const outcome = await service.testCredential(
+      workspaceA,
+      userA,
+      created.id,
+    );
+
+    expect(outcome).toEqual({ status: "invalid", code: "invalid_key" });
+    const stored = rows[0];
+    if (!stored) throw new Error("credential was not stored");
+    expect(stored.status).toBe("invalid");
+  });
+
+  it("does not let another workspace test the credential", async () => {
+    const { service, probed } = setupWith({ status: "valid" });
+    const created = await service.createCredential(
+      workspaceA,
+      userA,
+      request("Personal"),
+    );
+
+    await expect(
+      service.testCredential(workspaceB, userB, created.id),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(probed).toEqual([]);
+  });
+
+  it("treats an unknown credential as missing", async () => {
+    const { service } = setupWith({ status: "valid" });
+
+    await expect(
+      service.testCredential(workspaceA, userA, crypto.randomUUID()),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});

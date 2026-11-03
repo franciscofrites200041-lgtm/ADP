@@ -5,6 +5,7 @@ import {
   createContainer,
   createCredentialRepo,
   createCredentialSecretVault,
+  createHttpCredentialProbe,
   createSystemClock,
   createUuidV7IdGen,
 } from "@middleware/adapters";
@@ -64,6 +65,9 @@ async function composeApp(url: string, logger: Logger, idGen: IdGen) {
   });
   const credentials = createCredentialService({
     credentialRepo: createCredentialRepo(db),
+    // Real probe by default; a test that needs a deterministic answer injects
+    // its own through the same seam the container uses.
+    credentialProbe: createHttpCredentialProbe(),
     secretVault: createCredentialSecretVault(
       container.sql,
       container.workspaceKeys,

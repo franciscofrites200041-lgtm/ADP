@@ -78,6 +78,10 @@ export const credentialTestCodeSchema = z.enum([
   "provider_unreachable",
   "rate_limited",
   "provider_error",
+  // WP-14 owns the SSRF-safe client for user-supplied base URLs; until then an
+  // openai-compatible credential cannot be probed without sending its key to an
+  // arbitrary host.
+  "unsupported_provider",
 ]);
 export type CredentialTestCode = z.infer<typeof credentialTestCodeSchema>;
 

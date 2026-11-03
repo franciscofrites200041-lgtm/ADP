@@ -2,6 +2,7 @@ export type * from "./domain/credential.ts";
 export * from "./domain/errors.ts";
 export type * from "./ports/audit-log.ts";
 export type * from "./ports/clock.ts";
+export type * from "./ports/credential-probe.ts";
 export type * from "./ports/credential-repo.ts";
 export type * from "./ports/id-gen.ts";
 export * from "./ports/model-gateway.ts";

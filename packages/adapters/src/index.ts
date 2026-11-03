@@ -1,5 +1,6 @@
 export * from "./audit-log-repo.ts";
 export * from "./container.ts";
+export * from "./credential-probe.ts";
 export * from "./credential-repo.ts";
 export * from "./credential-secret-vault.ts";
 export * from "./envelope.ts";

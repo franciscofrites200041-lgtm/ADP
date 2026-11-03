@@ -33,6 +33,13 @@ export function createInMemoryPorts() {
     `${workspaceId}:${ref.table}:${ref.id}:`;
 
   const deps: CredentialServiceDeps = {
+    // Every test starts with a probe that fails loudly: a use case that forgets
+    // to inject a fake cannot quietly pass.
+    credentialProbe: {
+      async probe() {
+        throw new Error("no probe configured for this test");
+      },
+    },
     credentialRepo: {
       async insert(workspaceId, credential) {
         assertAliasFree(workspaceId, credential.alias);
@@ -44,6 +51,19 @@ export function createInMemoryPorts() {
           (candidate) => candidate.id === id,
         );
         return row ? view(row) : null;
+      },
+      async findSealed(workspaceId, id) {
+        return (
+          active(workspaceId).find((candidate) => candidate.id === id) ?? null
+        );
+      },
+      async setStatus(workspaceId, id, status) {
+        const row = active(workspaceId).find(
+          (candidate) => candidate.id === id,
+        );
+        if (!row) return null;
+        row.status = status;
+        return view(row);
       },
       async list(workspaceId) {
         return active(workspaceId)

@@ -5,6 +5,7 @@ import {
   createContainer,
   createCredentialRepo,
   createCredentialSecretVault,
+  createHttpCredentialProbe,
   createSystemClock,
   createUuidV7IdGen,
 } from "@middleware/adapters";
@@ -40,6 +41,7 @@ const auth = createAuth({
 });
 const credentials = createCredentialService({
   credentialRepo: createCredentialRepo(dbClient),
+  credentialProbe: createHttpCredentialProbe(),
   secretVault: createCredentialSecretVault(
     container.sql,
     container.workspaceKeys,

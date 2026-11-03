@@ -1,6 +1,7 @@
 import type {
   CreateCredentialRequest,
   CredentialResponse,
+  CredentialTestResponse,
   RenameCredentialRequest,
 } from "@middleware/contracts";
 
@@ -8,6 +9,7 @@ import type { Credential } from "../domain/credential.ts";
 import { NotFoundError } from "../domain/errors.ts";
 import type { AuditLog } from "../ports/audit-log.ts";
 import type { Clock } from "../ports/clock.ts";
+import type { CredentialProbe } from "../ports/credential-probe.ts";
 import type { CredentialRepo } from "../ports/credential-repo.ts";
 import type { IdGen } from "../ports/id-gen.ts";
 import type { SecretVault } from "../ports/secret-vault.ts";
@@ -16,6 +18,7 @@ const TABLE = "provider_credential";
 
 export type CredentialServiceDeps = {
   credentialRepo: CredentialRepo;
+  credentialProbe: CredentialProbe;
   secretVault: SecretVault;
   auditLog: AuditLog;
   clock: Clock;
@@ -41,6 +44,15 @@ export type CredentialService = {
     actorUserId: string,
     credentialId: string,
   ): Promise<void>;
+  /**
+   * Probes the stored key against its provider and records the outcome (S1).
+   * A credential of another workspace is indistinguishable from a missing one.
+   */
+  testCredential(
+    workspaceId: string,
+    actorUserId: string,
+    credentialId: string,
+  ): Promise<CredentialTestResponse>;
 };
 
 /** The public view (S2): picks fields instead of omitting, so a new column never leaks. */
@@ -57,6 +69,7 @@ function toResponse(credential: Credential): CredentialResponse {
 
 export function createCredentialService({
   credentialRepo,
+  credentialProbe,
   secretVault,
   auditLog,
   clock,
@@ -140,6 +153,44 @@ export function createCredentialService({
         "credential.archived",
         credentialId,
       );
+    },
+
+    async testCredential(workspaceId, actorUserId, credentialId) {
+      const stored = await credentialRepo.findSealed(workspaceId, credentialId);
+      if (!stored) throw new NotFoundError();
+
+      const apiKey = await secretVault.open(
+        workspaceId,
+        { table: TABLE, id: stored.id },
+        stored.secret,
+      );
+      const result = await credentialProbe.probe({
+        providerId: stored.providerId,
+        apiKey,
+        baseUrl: stored.baseUrl,
+      });
+
+      const updated = await credentialRepo.setStatus(
+        workspaceId,
+        credentialId,
+        result.status,
+      );
+      if (!updated) throw new NotFoundError();
+
+      // The key never reaches the audit log: only the outcome and its reason do.
+      await audit(
+        workspaceId,
+        actorUserId,
+        "credential.tested",
+        credentialId,
+        result.status === "valid"
+          ? { status: "valid" }
+          : { status: "invalid", code: result.code },
+      );
+
+      return result.status === "valid"
+        ? { status: "valid", code: null }
+        : { status: "invalid", code: result.code };
     },
   };
 }

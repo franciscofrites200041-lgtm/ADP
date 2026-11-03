@@ -100,6 +100,37 @@ export function createCredentialRepo(db: DbClient): CredentialRepo {
         await db.select(columns).from(table).where(active(workspaceId, id)),
       );
     },
+    async findSealed(workspaceId, id) {
+      const [row] = await db
+        .select()
+        .from(table)
+        .where(active(workspaceId, id));
+      if (!row) return null;
+      const { ciphertext, iv, authTag, kekVersion } = row;
+      if (!ciphertext || !iv || !authTag || !kekVersion) {
+        // A row without a complete envelope cannot be probed: treat it as absent
+        // instead of decrypting half a secret.
+        return null;
+      }
+      return {
+        ...toCredential(row),
+        secret: {
+          ciphertext,
+          iv,
+          authTag,
+          kekVersion,
+        },
+      };
+    },
+    async setStatus(workspaceId, id, status) {
+      return first(
+        await db
+          .update(table)
+          .set({ status })
+          .where(active(workspaceId, id))
+          .returning(columns),
+      );
+    },
     async list(workspaceId) {
       const rows = await db
         .select(columns)
