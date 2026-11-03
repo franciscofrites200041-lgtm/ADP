@@ -52,6 +52,8 @@ export const createAgentRequestSchema = z.strictObject({
   name: agentNameSchema,
   description: agentDescriptionSchema.optional(),
   version: agentVersionInputSchema,
+  /** The template it came from, when the agent was not created from scratch. */
+  templateId: agentId.optional(),
 });
 export type CreateAgentRequest = z.infer<typeof createAgentRequestSchema>;
 
@@ -108,4 +110,22 @@ export const agentVersionListResponseSchema = z.strictObject({
 });
 export type AgentVersionListResponse = z.infer<
   typeof agentVersionListResponseSchema
+>;
+
+/** A reusable starting point; global, not per workspace (WP-21). */
+export const agentTemplateSchema = z.strictObject({
+  id: z.uuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  instructions: z.string(),
+  suggestedParams: agentParamsSchema,
+  suggestedTools: agentToolsSchema,
+});
+export type AgentTemplate = z.infer<typeof agentTemplateSchema>;
+
+export const agentTemplateListResponseSchema = z.strictObject({
+  templates: z.array(agentTemplateSchema),
+});
+export type AgentTemplateListResponse = z.infer<
+  typeof agentTemplateListResponseSchema
 >;

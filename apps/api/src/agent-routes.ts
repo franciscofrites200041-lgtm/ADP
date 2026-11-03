@@ -1,6 +1,6 @@
 import {
+  agentIdParamSchema,
   createAgentRequestSchema,
-  credentialIdParamSchema,
   duplicateAgentRequestSchema,
   restoreAgentVersionRequestSchema,
   updateAgentRequestSchema,
@@ -18,7 +18,7 @@ import {
 const readJson = (c: Context): Promise<unknown> =>
   c.req.json().catch(() => undefined);
 
-const idOf = (c: Context) => credentialIdParamSchema.parse(c.req.param()).id;
+const idOf = (c: Context) => agentIdParamSchema.parse(c.req.param()).id;
 
 /** Thin handlers: parse, call the use case, return its result as is. */
 function agentHandlers(agents: AgentService) {
@@ -79,6 +79,9 @@ function agentHandlers(agents: AgentService) {
       return c.json(copy, 201);
     },
 
+    templates: async (c: Context<WorkspaceEnv>) =>
+      c.json({ templates: await agents.listTemplates() }),
+
     archive: async (c: Context<WorkspaceEnv>) => {
       await agents.archiveAgent(c.get("workspaceId"), c.get("userId"), idOf(c));
       return c.body(null, 204);
@@ -98,6 +101,9 @@ export function agentRoutes(
   const write = requireOrigin(allowedOrigins);
   const handle = agentHandlers(agents);
 
+  // Templates are a global catalogue, but still require a session: they are
+  // product content, not public data.
+  app.get("/api/agent-templates", session, handle.templates);
   app.get("/api/agents", session, handle.list);
   app.post("/api/agents", session, write, handle.create);
   app.get("/api/agents/:id", session, handle.get);

@@ -2,6 +2,7 @@
 
 import type {
   AgentResponse,
+  AgentTemplate,
   CredentialResponse,
   ModelDescriptor,
 } from "@middleware/contracts";
@@ -19,20 +20,22 @@ import {
 
 type FormProps = {
   credentials: CredentialResponse[];
+  /** A starting point: prefills the fields, still editable (WP-21). */
+  template?: AgentTemplate;
   /** Present means "edit this agent": saving appends a new version. */
   agent?: AgentResponse;
   onDone?: () => void;
 };
 
 /** Create an agent, or edit it into a new version. One form, one rule. */
-export function AgentForm({ credentials, agent, onDone }: FormProps) {
+export function AgentForm({ credentials, agent, template, onDone }: FormProps) {
   const t = useTranslations("agents");
   const fallback = t("errorAction");
   const create = useCreateAgent(fallback);
   const update = useUpdateAgent(fallback);
-  const [name, setName] = useState(agent?.name ?? "");
+  const [name, setName] = useState(agent?.name ?? template?.name ?? "");
   const [instructions, setInstructions] = useState(
-    agent?.currentVersion?.instructions ?? "",
+    agent?.currentVersion?.instructions ?? template?.instructions ?? "",
   );
   const [credentialId, setCredentialId] = useState(
     agent?.currentVersion?.credentialId ?? "",
@@ -57,15 +60,24 @@ export function AgentForm({ credentials, agent, onDone }: FormProps) {
       providerId: credential.providerId,
       modelId,
       credentialId: credential.id,
-      params: {},
-      tools: [],
+      // Editing must keep what the agent already has: falling back to the
+      // template would wipe params and tools on every save.
+      params: agent?.currentVersion?.params ?? template?.suggestedParams ?? {},
+      tools: agent?.currentVersion?.tools ?? template?.suggestedTools ?? [],
     };
     if (agent) {
       const input: UpdateAgentInput = { id: agent.id, name, version };
       update.mutate(input, { onSuccess: () => onDone?.() });
       return;
     }
-    create.mutate({ name, version }, { onSuccess: () => onDone?.() });
+    create.mutate(
+      {
+        name,
+        version,
+        ...(template === undefined ? {} : { templateId: template.id }),
+      },
+      { onSuccess: () => onDone?.() },
+    );
   };
 
   const error = create.error ?? update.error;
@@ -73,7 +85,11 @@ export function AgentForm({ credentials, agent, onDone }: FormProps) {
   return (
     <Card className="space-y-3 p-5">
       <p className="text-body font-medium text-ink">
-        {agent ? t("editTitle") : t("formTitle")}
+        {agent
+          ? t("editTitle")
+          : template
+            ? t("fromTemplateTitle", { name: template.name })
+            : t("formTitle")}
       </p>
       <form className="space-y-3" onSubmit={submit}>
         <Field label={t("name")} hint={t("nameHint")}>

@@ -1,3 +1,5 @@
+import type { AgentTemplate } from "@middleware/contracts";
+
 import type {
   Agent,
   AgentVersion,
@@ -55,4 +57,12 @@ export type AgentRepo = {
     workspaceId: string,
     agentId: string,
   ): Promise<AgentVersion | null>;
+
+  /**
+   * Templates are a global catalogue, not tenant data, so they carry no
+   * `workspaceId`. That is the one exception AGENTS.md records; it is not a
+   * request-scoped repository and no HTTP body can point it at another tenant.
+   */
+  listTemplates(): Promise<AgentTemplate[]>;
+  findTemplate(templateId: string): Promise<AgentTemplate | null>;
 };

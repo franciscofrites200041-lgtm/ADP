@@ -204,6 +204,31 @@ describe.skipIf(url === undefined)("agents API (postgres)", () => {
     expect(listed.agents).toEqual([]);
   });
 
+  it("keeps a template-created agent isolated too", async () => {
+    // The template path writes exactly the same rows, so it must be isolated by
+    // the same rule: the workspace check happens before any write.
+    const credentialForTemplate = await credential(ana, "desde-plantilla");
+    const res = await call(ana, "POST", "/api/agents", {
+      name: "Desde plantilla",
+      version: versionOf(credentialForTemplate, "Contenido de la plantilla."),
+    });
+    expect(res.status).toBe(201);
+    const created = agentResponseSchema.parse(await res.json());
+
+    await expectError(
+      await call(beto, "GET", `/api/agents/${created.id}`),
+      404,
+      "not_found",
+    );
+    await expectError(
+      await call(beto, "POST", `/api/agents/${created.id}/duplicate`, {
+        name: "Robado",
+      }),
+      404,
+      "not_found",
+    );
+  });
+
   it("duplicates an agent with a copy of its current version", async () => {
     const agent = await create(ana, "Original", "Contenido original.");
 

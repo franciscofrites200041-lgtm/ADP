@@ -1,6 +1,6 @@
 "use client";
 
-import type { AgentResponse } from "@middleware/contracts";
+import type { AgentResponse, AgentTemplate } from "@middleware/contracts";
 import { Card } from "@middleware/ui";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
@@ -10,6 +10,7 @@ import { AgentForm } from "./agent-form.tsx";
 import { AgentRow } from "./agent-row.tsx";
 import {
   useAgents,
+  useAgentTemplates,
   useArchiveAgent,
   useCredentialPicker,
   useDuplicateAgent,
@@ -23,7 +24,9 @@ export function AgentsScreen() {
   const credentials = useCredentialPicker(fallback);
   const archive = useArchiveAgent(fallback);
   const duplicate = useDuplicateAgent(fallback);
+  const templates = useAgentTemplates(fallback);
   const [editing, setEditing] = useState<AgentResponse | null>(null);
+  const [template, setTemplate] = useState<AgentTemplate | null>(null);
 
   const availableCredentials = credentials.data ?? [];
   const hasCredentials = availableCredentials.length > 0;
@@ -31,12 +34,39 @@ export function AgentsScreen() {
   return (
     <div className="space-y-4">
       {hasCredentials ? (
-        <AgentForm
-          key={editing?.id ?? "new"}
-          credentials={availableCredentials}
-          {...(editing ? { agent: editing } : {})}
-          onDone={() => setEditing(null)}
-        />
+        <>
+          <label className="block px-1 text-small text-ink-2">
+            {t("templateLabel")}
+            <select
+              className="mt-1 min-h-11 w-full rounded-field bg-surface-2 px-3 text-body text-ink"
+              value={template?.id ?? ""}
+              onChange={(event) =>
+                setTemplate(
+                  (templates.data ?? []).find(
+                    (item) => item.id === event.target.value,
+                  ) ?? null,
+                )
+              }
+            >
+              <option value="">{t("templateNone")}</option>
+              {(templates.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <AgentForm
+            key={`${editing?.id ?? "new"}:${template?.id ?? "blank"}`}
+            credentials={availableCredentials}
+            {...(editing ? { agent: editing } : {})}
+            {...(template && !editing ? { template } : {})}
+            onDone={() => {
+              setEditing(null);
+              setTemplate(null);
+            }}
+          />
+        </>
       ) : (
         <Card className="space-y-2 p-5">
           <p className="text-body text-ink">{t("needsCredentialTitle")}</p>

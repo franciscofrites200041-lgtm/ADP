@@ -14,6 +14,9 @@ export const messages = {
     needsCredentialBody:
       "Sin una credencial no hay modelo que usar. Conectá una en Proveedores y volvé.",
     formTitle: "Crear un agente",
+    fromTemplateTitle: 'Crear "{name}" desde la plantilla',
+    templateLabel: "Empezar desde una plantilla",
+    templateNone: "Desde cero",
     editTitle: "Editar el agente",
     name: "Nombre",
     nameHint: "Cómo lo vas a reconocer, por ejemplo Atención al cliente.",

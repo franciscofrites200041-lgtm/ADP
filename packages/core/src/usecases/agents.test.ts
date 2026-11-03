@@ -1,6 +1,7 @@
 import type { AgentVersionInput } from "@middleware/contracts";
 import { describe, expect, it } from "vitest";
 
+import { NotFoundError } from "../domain/errors.ts";
 import { createInMemoryAgentRepo } from "../testing/in-memory-agent-ports.ts";
 import { createInMemoryPorts } from "../testing/in-memory-ports.ts";
 import { createAgentService } from "./agents.ts";
@@ -108,6 +109,50 @@ describe("agents and their versions", () => {
     expect(agentRepo.versions).toHaveLength(3);
     const original = agentRepo.versions.find((v) => v.id === first.id);
     expect(original?.instructions).toBe("Primera.");
+  });
+
+  it("keeps params and tools when a version is edited", async () => {
+    const { service, credential } = setup();
+    const credentialId = await credential(workspaceA, "Personal");
+    const created = await service.createAgent(workspaceA, userA, {
+      name: "Soporte",
+      version: {
+        ...content("Primera.", credentialId),
+        params: { temperature: 0.7, maxTokens: 2048 },
+        tools: ["web_search", "run_code"],
+      },
+    });
+
+    // Only the instructions change: the rest must survive the edit. A form that
+    // falls back to the template (or to nothing) silently wipes them.
+    const updated = await service.updateAgent(workspaceA, userA, created.id, {
+      version: {
+        ...content("Segunda.", credentialId),
+        params: created.currentVersion?.params ?? {},
+        tools: created.currentVersion?.tools ?? [],
+      },
+    });
+
+    expect(updated.currentVersion?.params).toEqual({
+      temperature: 0.7,
+      maxTokens: 2048,
+    });
+    expect(updated.currentVersion?.tools).toEqual(["web_search", "run_code"]);
+  });
+
+  it("refuses a template that does not exist", async () => {
+    const { service, agentRepo, credential } = setup();
+    const credentialId = await credential(workspaceA, "Personal");
+
+    await expect(
+      service.createAgent(workspaceA, userA, {
+        name: "Con plantilla fantasma",
+        templateId: "0190a5f2-0000-7000-8000-0000000f0000",
+        version: content("X.", credentialId),
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+
+    expect(agentRepo.agents).toHaveLength(0);
   });
 
   it("duplicates an agent with a copy of its current version", async () => {

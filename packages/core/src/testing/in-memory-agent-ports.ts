@@ -1,12 +1,15 @@
 import type {
   Agent,
+  AgentTemplate,
   AgentVersion,
   StoredAgentVersion,
 } from "../domain/agent.ts";
 import type { AgentRepo } from "../ports/agent-repo.ts";
 
 /** In-memory agent store honouring the port: versions are append-only. */
-export function createInMemoryAgentRepo(): AgentRepo & {
+export function createInMemoryAgentRepo(
+  templates: readonly AgentTemplate[] = [],
+): AgentRepo & {
   agents: Agent[];
   versions: AgentVersion[];
 } {
@@ -110,6 +113,12 @@ export function createInMemoryAgentRepo(): AgentRepo & {
           version.workspaceId === workspaceId && version.agentId === agentId,
       );
       return own.reduce((max, version) => Math.max(max, version.version), 0);
+    },
+    async listTemplates() {
+      return [...templates];
+    },
+    async findTemplate(templateId) {
+      return templates.find((template) => template.id === templateId) ?? null;
     },
     async currentVersion(workspaceId, agentId) {
       const agent = find(workspaceId, agentId);

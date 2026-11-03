@@ -7,7 +7,7 @@
 ## Lenguaje y estilo
 - TypeScript estricto (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`). Prohibido `any`; usá `unknown` y validá.
 - Biome para lint y formato; el CI falla con cualquier warning.
-- Identificadores, código y commits en inglés. Textos de UI y mensajes de error al usuario en español rioplatense, desde el archivo de mensajes.
+- Identificadores, código y commits en inglés. Textos de UI y mensajes de error al usuario en español rioplatense, desde el archivo de mensajes. **Excepción:** el contenido que es *dato* —plantillas de agente, instrucciones que el usuario clona y después edita— vive en la base, no en `messages.ts`; `messages.ts` es para la copy de la aplicación.
 - Archivos en kebab-case; componentes React en PascalCase; un componente por archivo.
 - Conventional Commits (`feat(api): …`, `fix(web): …`).
 
@@ -19,7 +19,7 @@
 - Next.js no accede a la base: todo pasa por la API.
 
 ## Seguridad (ver §8 del maestro)
-- Todo repositorio recibe `workspaceId` primero, y sale de la sesión o del token, nunca del request.
+- Todo repositorio recibe `workspaceId` primero, y sale de la sesión o del token, nunca del request. **Única excepción:** el catálogo global de plantillas de agente (`agent_template`) no es dato de tenant y por eso no se filtra por workspace; cualquier otra excepción necesita un ADR.
 - Nunca loguees, devuelvas ni guardes en eventos una API key o un secreto.
 - Nunca leas keys de proveedores desde variables de entorno; pasalas explícitas por ejecución.
 - Nada de `fetch` a URLs del usuario fuera del cliente HTTP protegido contra SSRF.

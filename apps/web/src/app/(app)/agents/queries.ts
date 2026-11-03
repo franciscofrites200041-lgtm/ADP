@@ -2,10 +2,12 @@
 
 import {
   type AgentResponse,
+  type AgentTemplate,
   type AgentVersionResponse,
   agentIdParamSchema,
   agentListResponseSchema,
   agentResponseSchema,
+  agentTemplateListResponseSchema,
   agentVersionListResponseSchema,
   type CreateAgentRequest,
   createAgentRequestSchema,
@@ -52,6 +54,22 @@ export function useAgents(
         "/api/agents",
         { method: "GET" },
         (body) => agentListResponseSchema.parse(body).agents,
+        fallback,
+      ),
+  });
+}
+
+/** The global template catalogue: choosing one prefills the form (WP-21). */
+export function useAgentTemplates(
+  fallback: string,
+): UseQueryResult<AgentTemplate[], Error> {
+  return useQuery({
+    queryKey: ["agent-templates"],
+    queryFn: () =>
+      requestJson(
+        "/api/agent-templates",
+        { method: "GET" },
+        (body) => agentTemplateListResponseSchema.parse(body).templates,
         fallback,
       ),
   });

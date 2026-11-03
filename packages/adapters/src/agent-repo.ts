@@ -6,11 +6,16 @@ import {
 import type {
   Agent,
   AgentRepo,
+  AgentTemplate,
   AgentVersion,
   StoredAgent,
   StoredAgentVersion,
 } from "@middleware/core";
-import { agent as agentTable, agentVersion } from "@middleware/db";
+import {
+  agent as agentTable,
+  agentTemplate as agentTemplateTable,
+  agentVersion,
+} from "@middleware/db";
 import { and, desc, eq, isNull, max } from "drizzle-orm";
 import type { drizzle } from "drizzle-orm/postgres-js";
 
@@ -33,6 +38,18 @@ const active = (workspaceId: string, id: string) =>
     eq(agentTable.id, id),
     isNull(agentTable.archivedAt),
   );
+
+/** Template rows are global: same Zod validation as a version, no workspace. */
+const toTemplate = (
+  row: typeof agentTemplateTable.$inferSelect,
+): AgentTemplate => ({
+  id: row.id,
+  name: row.name,
+  description: row.description,
+  instructions: row.instructions,
+  suggestedParams: agentParamsSchema.parse(row.suggestedParams),
+  suggestedTools: agentToolsSchema.parse(row.suggestedTools),
+});
 
 const toAgent = (row: typeof agentTable.$inferSelect): Agent => ({
   id: row.id,
@@ -207,6 +224,22 @@ export function createAgentRepo(db: Database): AgentRepo {
           ),
         );
       return rows[0]?.latest ?? 0;
+    },
+
+    async listTemplates() {
+      const rows = await db
+        .select()
+        .from(agentTemplateTable)
+        .orderBy(agentTemplateTable.name);
+      return rows.map(toTemplate);
+    },
+
+    async findTemplate(templateId) {
+      const rows = await db
+        .select()
+        .from(agentTemplateTable)
+        .where(eq(agentTemplateTable.id, templateId));
+      return rows[0] ? toTemplate(rows[0]) : null;
     },
 
     async currentVersion(workspaceId, agentId) {

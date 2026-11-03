@@ -1,5 +1,6 @@
 import type {
   AgentResponse,
+  AgentTemplate,
   AgentVersionInput,
   AgentVersionResponse,
   CreateAgentRequest,
@@ -62,6 +63,8 @@ export type AgentService = {
     workspaceId: string,
     agentId: string,
   ): Promise<AgentVersionResponse[]>;
+  /** The global template catalogue (WP-21). */
+  listTemplates(): Promise<AgentTemplate[]>;
 };
 
 const toVersionResponse = (version: AgentVersion): AgentVersionResponse => ({
@@ -163,6 +166,10 @@ export function createAgentService({
       // Authorise before writing anything: a rejected credential must not leave
       // an agent behind (found by the cross-tenant integration test).
       await assertCredential(workspaceId, input.version.credentialId);
+      if (input.templateId !== undefined) {
+        const template = await agentRepo.findTemplate(input.templateId);
+        if (!template) throw new NotFoundError("template_not_found");
+      }
       // Agent and first version land together: there is no moment where an agent
       // exists without a version.
       const createdId = idGen.newId();
@@ -175,7 +182,7 @@ export function createAgentService({
             name: input.name,
             description: input.description ?? null,
             currentVersionId: null,
-            templateId: null,
+            templateId: input.templateId ?? null,
             createdBy: actorUserId,
             archivedAt: null,
           },
@@ -216,8 +223,9 @@ export function createAgentService({
 
     async updateAgent(workspaceId, actorUserId, agentId, input) {
       const agent = await requireAgent(workspaceId, agentId);
-      // Same ordering rule as creation: if the version names a credential we do
-      // not own, nothing is written at all, not even the rename.
+      // The credential is checked before the rename, so a foreign one writes
+      // nothing. A failure *after* the rename (inserting the version) leaves the
+      // new name in place: the rename is its own write, not part of the version.
       if (input.version !== undefined) {
         await assertCredential(workspaceId, input.version.credentialId);
       }
@@ -292,26 +300,35 @@ export function createAgentService({
         throw new NotFoundError("version_not_found");
       }
 
-      // Same ordering rule as creation: no write before the credential is ours.
+      // Same rules as creation: the credential is checked first, and the copy
+      // lands as one unit so a versionless agent is never observable.
       await assertCredential(workspaceId, current.credentialId);
-      const copy = await agentRepo.insert(workspaceId, {
-        id: idGen.newId(),
+      const copyId = idGen.newId();
+      const { agent: copy } = await agentRepo.insertWithFirstVersion(
         workspaceId,
-        name: input.name,
-        description: source.description,
-        currentVersionId: null,
-        templateId: source.templateId,
-        createdBy: actorUserId,
-        archivedAt: null,
-      });
-      await appendVersion(workspaceId, copy.id, {
-        instructions: current.instructions,
-        providerId: current.providerId,
-        modelId: current.modelId,
-        credentialId: current.credentialId,
-        params: current.params,
-        tools: current.tools,
-      });
+        {
+          id: copyId,
+          workspaceId,
+          name: input.name,
+          description: source.description,
+          currentVersionId: null,
+          templateId: source.templateId,
+          createdBy: actorUserId,
+          archivedAt: null,
+        },
+        {
+          id: idGen.newId(),
+          agentId: copyId,
+          workspaceId,
+          version: 1,
+          instructions: current.instructions,
+          providerId: current.providerId,
+          modelId: current.modelId,
+          credentialId: current.credentialId,
+          params: current.params,
+          tools: current.tools,
+        },
+      );
       await audit(
         workspaceId,
         actorUserId,
@@ -331,6 +348,10 @@ export function createAgentService({
       );
       if (!archived) throw new NotFoundError();
       await audit(workspaceId, actorUserId, "agent.archived", AGENTS, agentId);
+    },
+
+    async listTemplates() {
+      return agentRepo.listTemplates();
     },
 
     async listVersions(workspaceId, agentId) {

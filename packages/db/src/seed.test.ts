@@ -2,21 +2,27 @@ import { describe, expect, it } from "vitest";
 
 import type { DbClient } from "./client.ts";
 import { type SeedStep, seed, seedSteps } from "./seed.ts";
+import { agentTemplateSeedData } from "./seed-agent-templates.ts";
 
 function fakeDb(): DbClient {
   return {} as unknown as DbClient;
 }
 
 describe("seed", () => {
-  it("registers no steps until WP-21 template data exists", () => {
-    expect(seedSteps).toHaveLength(0);
+  it("registers the six agent templates of WP-21", () => {
+    expect(seedSteps.map((step) => step.name)).toEqual(["agent-templates"]);
+    // The master names exactly these six; the seed carries them verbatim.
+    expect(agentTemplateSeedData).toHaveLength(6);
   });
 
-  it("is an idempotent no-op: seeding twice never touches the database", async () => {
-    const db = fakeDb();
+  it("gives every template a stable id, which is what makes the seed idempotent", () => {
+    const ids = agentTemplateSeedData.map((template) => template.id);
 
-    await expect(seed(db)).resolves.toBeUndefined();
-    await expect(seed(db)).resolves.toBeUndefined();
+    expect(new Set(ids).size).toBe(ids.length);
+    // A re-run conflicts on the primary key instead of inserting a second copy.
+    expect(ids).toEqual(
+      expect.arrayContaining(["0190a5f2-0000-7000-8000-0000000a0001"]),
+    );
   });
 
   it("runs each registered step exactly once per invocation, in order", async () => {

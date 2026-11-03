@@ -1,9 +1,13 @@
-import type { AgentParams, ProviderId } from "@middleware/contracts";
+import type {
+  AgentParams,
+  AgentTemplate,
+  ProviderId,
+} from "@middleware/contracts";
 
 // Re-exported so adapters can type the jsonb column without importing contracts
 // directly. The domain keeps `Date` where the contract carries an ISO string:
 // they are different shapes on purpose, not duplicates.
-export type { AgentParams };
+export type { AgentParams, AgentTemplate };
 
 /** An agent's mutable identity; its content lives in immutable versions. */
 export type Agent = {

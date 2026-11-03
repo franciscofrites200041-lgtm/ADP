@@ -10,4 +10,5 @@ export {
   auditLog,
   providerCredential,
 } from "./schema/index.ts";
-export { type SeedStep, seed, seedSteps } from "./seed.ts";
+export { type SeedStep, seed, seedDatabase, seedSteps } from "./seed.ts";
+export { seedAgentTemplates } from "./seed-agent-templates.ts";
