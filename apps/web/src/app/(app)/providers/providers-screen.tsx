@@ -11,6 +11,7 @@ import {
   useCredentials,
   useRenameCredential,
   userMessage,
+  useTestCredential,
 } from "./queries.ts";
 
 /** The Providers screen: list, states and the create form. */
@@ -21,6 +22,7 @@ export function ProvidersScreen() {
   const create = useCreateCredential(fallback);
   const rename = useRenameCredential(fallback);
   const archive = useArchiveCredential(fallback);
+  const test = useTestCredential(fallback);
 
   return (
     <div className="space-y-4">
@@ -68,6 +70,7 @@ export function ProvidersScreen() {
               credential={credential}
               rename={rename}
               archive={archive}
+              test={test}
             />
           ))}
         </section>

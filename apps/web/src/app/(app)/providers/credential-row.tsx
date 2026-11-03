@@ -1,6 +1,9 @@
 "use client";
 
-import type { CredentialResponse } from "@middleware/contracts";
+import type {
+  CredentialResponse,
+  CredentialTestResponse,
+} from "@middleware/contracts";
 import { Badge, IconTile, RaisedRow } from "@middleware/ui";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
@@ -11,12 +14,18 @@ import {
   providerLabel,
   providerMonogram,
 } from "./providers-helpers.ts";
-import { type ArchiveInput, type RenameInput, userMessage } from "./queries.ts";
+import {
+  type ArchiveInput,
+  type RenameInput,
+  type TestInput,
+  userMessage,
+} from "./queries.ts";
 
 type RowProps = {
   credential: CredentialResponse;
   rename: UseMutationResult<CredentialResponse, Error, RenameInput>;
   archive: UseMutationResult<void, Error, ArchiveInput>;
+  test: UseMutationResult<CredentialTestResponse, Error, TestInput>;
 };
 
 const statusTone = {
@@ -26,15 +35,18 @@ const statusTone = {
 } as const;
 
 /** One credential: alias, masked key, status, and inline rename/archive. */
-export function CredentialRow({ credential, rename, archive }: RowProps) {
+export function CredentialRow({ credential, rename, archive, test }: RowProps) {
   const t = useTranslations("providers");
   const [isRenaming, setIsRenaming] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [alias, setAlias] = useState(credential.alias);
+  // Only the outcome of the test aimed at THIS row.
+  const outcome = test.variables?.id === credential.id ? test.data : undefined;
   // Only the error of a mutation aimed at THIS row.
   const rowError =
     (rename.variables?.id === credential.id ? rename.error : null) ??
-    (archive.variables?.id === credential.id ? archive.error : null);
+    (archive.variables?.id === credential.id ? archive.error : null) ??
+    (test.variables?.id === credential.id ? test.error : null);
 
   return (
     <RaisedRow className="flex flex-wrap items-center gap-3 p-4">
@@ -85,12 +97,14 @@ export function CredentialRow({ credential, rename, archive }: RowProps) {
               className="font-mono text-small text-ink-2"
               title={t("maskedHint")}
             >
-              {providerLabel(credential.providerId)} ·{" "}
-              {maskLast4(credential.last4)}
+              {t("maskedLine", {
+                provider: providerLabel(credential.providerId),
+                masked: maskLast4(credential.last4),
+              })}
             </p>
             {credential.baseUrl ? (
               <p className="truncate font-mono text-caption text-muted">
-                {t("baseUrlLabel")}: {credential.baseUrl}
+                {t("baseUrlLine", { url: credential.baseUrl })}
               </p>
             ) : null}
           </>
@@ -126,6 +140,14 @@ export function CredentialRow({ credential, rename, archive }: RowProps) {
           <button
             type="button"
             className="min-h-11 rounded-field bg-raised px-3 text-small text-ink shadow-raised"
+            disabled={test.isPending}
+            onClick={() => test.mutate({ id: credential.id })}
+          >
+            {test.isPending ? t("testing") : t("test")}
+          </button>
+          <button
+            type="button"
+            className="min-h-11 rounded-field bg-raised px-3 text-small text-ink shadow-raised"
             onClick={() => setIsRenaming(true)}
           >
             {t("rename")}
@@ -139,6 +161,11 @@ export function CredentialRow({ credential, rename, archive }: RowProps) {
           </button>
         </div>
       )}
+      {outcome?.status === "invalid" && outcome.code ? (
+        <p className="w-full text-small text-danger" role="status">
+          {t(`testCodes.${outcome.code}`)}
+        </p>
+      ) : null}
       {rowError ? (
         <p className="w-full text-small text-danger" role="alert">
           {userMessage(rowError, t("errorTitle"))}

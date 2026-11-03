@@ -3,8 +3,11 @@
 import {
   type CreateCredentialRequest,
   type CredentialResponse,
+  type CredentialTestResponse,
+  createCredentialRequestSchema,
   type credentialIdParamSchema,
   credentialResponseSchema,
+  credentialTestResponseSchema,
   type RenameCredentialRequest,
   renameCredentialRequestSchema,
 } from "@middleware/contracts";
@@ -25,6 +28,7 @@ type CredentialId = z.infer<typeof credentialIdParamSchema>["id"];
 /** Path id plus the validated body: both shapes come from the contracts. */
 export type RenameInput = RenameCredentialRequest & { id: CredentialId };
 export type ArchiveInput = { id: CredentialId };
+export type TestInput = { id: CredentialId };
 
 /** Same-origin calls: the session cookie rides along and the API sees the app origin (S10). */
 async function requestJson<T>(
@@ -102,13 +106,17 @@ export function useCreateCredential(
 ): UseMutationResult<CredentialResponse, Error, CreateCredentialRequest> {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: (input) =>
-      requestJson(
+    mutationFn: (input) => {
+      // Validated here too: the form is a boundary, and the contracts own the shape.
+      const parsed = createCredentialRequestSchema.safeParse(input);
+      if (!parsed.success) throw new ClientError(fallback);
+      return requestJson(
         "/api/credentials",
-        { method: "POST", body: JSON.stringify(input) },
+        { method: "POST", body: JSON.stringify(parsed.data) },
         (body) => credentialResponseSchema.parse(body),
         fallback,
-      ),
+      );
+    },
     onSuccess: invalidate,
   });
 }
@@ -129,6 +137,22 @@ export function useRenameCredential(
         fallback,
       );
     },
+    onSuccess: invalidate,
+  });
+}
+
+export function useTestCredential(
+  fallback: string,
+): UseMutationResult<CredentialTestResponse, Error, TestInput> {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: ({ id }) =>
+      requestJson(
+        `/api/credentials/${encodeURIComponent(id)}/test`,
+        { method: "POST" },
+        (body) => credentialTestResponseSchema.parse(body),
+        fallback,
+      ),
     onSuccess: invalidate,
   });
 }
