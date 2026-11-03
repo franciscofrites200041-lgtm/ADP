@@ -58,7 +58,12 @@ export const agentVersion = pgTable(
     instructions: text("instructions").notNull(),
     providerId: text("provider_id").notNull(),
     modelId: text("model_id").notNull(),
-    credentialId: uuid("credential_id").references(() => providerCredential.id),
+    credentialId: uuid("credential_id").references(
+      () => providerCredential.id,
+      // A credential can be archived or removed; the version stays as history and
+      // simply reports no credential (see ADR-0006 and the agents use case).
+      { onDelete: "set null" },
+    ),
     params: jsonb("params").notNull(),
     tools: jsonb("tools").notNull(),
     createdBy: uuid("created_by"),

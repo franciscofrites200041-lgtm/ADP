@@ -1,3 +1,4 @@
+export * from "./agent-repo.ts";
 export * from "./audit-log-repo.ts";
 export * from "./container.ts";
 export * from "./credential-probe.ts";

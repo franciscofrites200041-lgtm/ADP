@@ -1,7 +1,11 @@
-import type { CredentialService, ModelService } from "@middleware/core";
+import type {
+  AgentService,
+  CredentialService,
+  ModelService,
+} from "@middleware/core";
 import { Hono } from "hono";
 import type { Logger } from "pino";
-
+import { agentRoutes } from "./agent-routes.ts";
 import type { Auth } from "./auth.ts";
 import { credentialRoutes } from "./credentials-routes.ts";
 import { createErrorHandler } from "./http-errors.ts";
@@ -19,6 +23,8 @@ export interface CreateAppOptions {
   credentials?: CredentialService;
   /** Model discovery (WP-13); mounted with `credentials`. */
   models?: ModelService;
+  /** Agent CRUD and versions (WP-20); mounted with `auth`. */
+  agents?: AgentService;
   /** Origins allowed to write; defaults to none, which rejects every write. */
   allowedOrigins?: readonly string[];
   logger?: Logger;
@@ -34,6 +40,7 @@ export function createApp({
   auth,
   credentials,
   models,
+  agents,
   allowedOrigins = [],
   logger = createLogger(),
 }: CreateAppOptions): Hono {
@@ -61,6 +68,9 @@ export function createApp({
         "/",
         credentialRoutes(auth, credentials, allowedOrigins, models),
       );
+    }
+    if (agents) {
+      app.route("/", agentRoutes(auth, agents, allowedOrigins));
     }
   }
 

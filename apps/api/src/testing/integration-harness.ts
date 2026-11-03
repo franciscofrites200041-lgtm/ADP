@@ -1,11 +1,11 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import {
+  createAgentRepo,
   createAuditLogRepo,
   createContainer,
   createCredentialRepo,
   createCredentialSecretVault,
-  createHttpCredentialProbe,
   createInMemoryModelCache,
   createPiModelGateway,
   createSystemClock,
@@ -13,6 +13,7 @@ import {
 } from "@middleware/adapters";
 import {
   type CredentialProbe,
+  createAgentService,
   createCredentialService,
   createModelService,
   type IdGen,
@@ -118,11 +119,19 @@ async function composeApp(
     modelCache: createInMemoryModelCache(),
     clock: createSystemClock(),
   });
+  const agents = createAgentService({
+    agentRepo: createAgentRepo(db),
+    credentialRepo: createCredentialRepo(db),
+    auditLog: createAuditLogRepo(db),
+    clock: createSystemClock(),
+    idGen,
+  });
   const app = createApp({
     ready: async () => true,
     auth,
     credentials,
     models,
+    agents,
     allowedOrigins: [TEST_ORIGIN],
     logger,
   });
@@ -192,6 +201,9 @@ export async function createIntegrationHarness(
   async function close() {
     // No foreign keys point at the workspace from these three tables.
     for (const id of workspaceIds) {
+      // Children first: agent_version points at both the agent and the credential.
+      await sql`delete from agent_version where workspace_id = ${id}`;
+      await sql`delete from agent where workspace_id = ${id}`;
       await sql`delete from provider_credential where workspace_id = ${id}`;
       await sql`delete from audit_log where workspace_id = ${id}`;
       await sql`delete from workspace_key where workspace_id = ${id}`;

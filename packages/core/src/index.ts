@@ -1,5 +1,7 @@
+export type * from "./domain/agent.ts";
 export type * from "./domain/credential.ts";
 export * from "./domain/errors.ts";
+export type * from "./ports/agent-repo.ts";
 export type * from "./ports/audit-log.ts";
 export type * from "./ports/clock.ts";
 export type * from "./ports/credential-probe.ts";
@@ -8,5 +10,6 @@ export type * from "./ports/id-gen.ts";
 export type * from "./ports/model-cache.ts";
 export * from "./ports/model-gateway.ts";
 export type * from "./ports/secret-vault.ts";
+export * from "./usecases/agents.ts";
 export * from "./usecases/credentials.ts";
 export * from "./usecases/models.ts";

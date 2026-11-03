@@ -79,7 +79,7 @@ export const agentVersionResponseSchema = z.strictObject({
   instructions: z.string(),
   providerId: providerIdSchema,
   modelId: z.string(),
-  credentialId: z.uuid(),
+  credentialId: z.uuid().nullable(),
   params: agentParamsSchema,
   tools: agentToolsSchema,
   createdAt: z.string(),

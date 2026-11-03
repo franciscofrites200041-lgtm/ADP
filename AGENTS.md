@@ -27,7 +27,7 @@
 
 ## Tests
 - Test primero cuando hay un resultado esperado claro: rojo, verde, refactor.
-- Unit con Vitest al lado del archivo (`*.test.ts`). Integración con Testcontainers (Postgres real). E2E con Playwright.
+- Unit con Vitest al lado del archivo (`*.test.ts`). Integración contra un Postgres **real**: Testcontainers cuando haya motor de contenedores disponible; si no, un clúster descartable con guardia de host y nombre de base (ADR-0006, Docker rechazado por el dueño del producto). Nunca un doble en memoria para lo cross-tenant. E2E con Playwright.
 - Para modelos, usá el proveedor faux de `pi-ai`; nunca llames a un proveedor real en CI.
 - Un bug se arregla con un test que lo reproduce primero.
 

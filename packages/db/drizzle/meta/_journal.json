@@ -29,6 +29,13 @@
       "when": 1793640645421,
       "tag": "0003_awesome_killer_shrike",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793667074260,
+      "tag": "0004_light_starhawk",
+      "breakpoints": true
     }
   ]
 }

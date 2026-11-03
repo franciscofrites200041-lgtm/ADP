@@ -1,6 +1,7 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { serve } from "@hono/node-server";
 import {
+  createAgentRepo,
   createAuditLogRepo,
   createContainer,
   createCredentialRepo,
@@ -11,7 +12,11 @@ import {
   createSystemClock,
   createUuidV7IdGen,
 } from "@middleware/adapters";
-import { createCredentialService, createModelService } from "@middleware/core";
+import {
+  createAgentService,
+  createCredentialService,
+  createModelService,
+} from "@middleware/core";
 import { createDbClient, ping } from "@middleware/db";
 
 import { createApp } from "./app.ts";
@@ -62,12 +67,20 @@ const models = createModelService({
   modelCache: createInMemoryModelCache(),
   clock: createSystemClock(),
 });
+const agents = createAgentService({
+  agentRepo: createAgentRepo(dbClient),
+  credentialRepo: createCredentialRepo(dbClient),
+  auditLog: createAuditLogRepo(dbClient),
+  clock: createSystemClock(),
+  idGen: createUuidV7IdGen(),
+});
 const logger = createLogger();
 const app = createApp({
   ready: () => ping(dbClient),
   auth,
   credentials,
   models,
+  agents,
   allowedOrigins: [BETTER_AUTH_URL],
   logger,
 });
