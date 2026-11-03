@@ -95,13 +95,10 @@ export const credentialTestResponseSchema = z
     status: z.enum(["valid", "invalid"]),
     code: credentialTestCodeSchema.nullable(),
   })
-  .refine(
-    (result) => (result.status === "valid") === (result.code === null),
-    {
-      path: ["code"],
-      message: "code is null exactly when the credential is valid",
-    },
-  );
+  .refine((result) => (result.status === "valid") === (result.code === null), {
+    path: ["code"],
+    message: "code is null exactly when the credential is valid",
+  });
 export type CredentialTestResponse = z.infer<
   typeof credentialTestResponseSchema
 >;
