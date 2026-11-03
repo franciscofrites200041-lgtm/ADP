@@ -16,7 +16,7 @@ export type CredentialStatus = z.infer<typeof credentialStatusSchema>;
 
 /** Only https base URLs; the SSRF-safe client that calls them is WP-14. */
 // Developer-facing validation text only: apps/api/src/http-errors.ts maps every
-// ZodError to the  code and takes the user message from
+// ZodError to the `invalid_request` code and takes the user message from
 // messages.ts, so no string in this file is ever rendered to a user.
 export const createCredentialRequestSchema = z
   .strictObject({
