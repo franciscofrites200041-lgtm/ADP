@@ -1,10 +1,5 @@
-import {
-  type CredentialResponse,
-  credentialListResponseSchema,
-  errorBodySchema,
-  type ProviderId,
-  providerCatalog,
-} from "@middleware/contracts";
+import type { ProviderId } from "@middleware/contracts";
+import { providerCatalog } from "@middleware/contracts";
 
 /** `····9f3k`: the only part of a key the UI may ever show (S2). */
 export function maskLast4(last4: string): string {
@@ -29,19 +24,4 @@ export function providerLabel(providerId: ProviderId): string {
 /** First letter of the provider label, for the monogram tile. */
 export function providerMonogram(providerId: ProviderId): string {
   return providerLabel(providerId).slice(0, 1).toUpperCase();
-}
-
-/**
- * Validated list from the API. A body that does not match the contract becomes
- * an error instead of rendering half a table (the schemas are strict, so a
- * response carrying `apiKey` or `ciphertext` is rejected here).
- */
-export function parseCredentialList(input: unknown): CredentialResponse[] {
-  return credentialListResponseSchema.parse(input).credentials;
-}
-
-/** The API's own Spanish message, or a generic one when the body is unknown. */
-export function apiErrorMessage(input: unknown, fallback: string): string {
-  const parsed = errorBodySchema.safeParse(input);
-  return parsed.success ? parsed.data.error.message : fallback;
 }

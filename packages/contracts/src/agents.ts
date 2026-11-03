@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { credentialIdParamSchema } from "./credentials.ts";
 import { providerIdSchema } from "./providers.ts";
 
 /** Same rules as the credential alias: no control characters, no NUL. */
@@ -30,7 +29,10 @@ export type AgentParams = z.infer<typeof agentParamsSchema>;
 /** Tool ids are ours, not free text: the run engine resolves them (WP-30). */
 export const agentToolsSchema = z.array(z.string().trim().min(1).max(64));
 
-const agentId = credentialIdParamSchema.shape.id;
+/** Its own path param: an agent id must not borrow the credential schema. */
+export const agentIdParamSchema = z.strictObject({ id: z.uuid() });
+
+const agentId = agentIdParamSchema.shape.id;
 
 /**
  * The content of one version. Immutable once written: editing an agent inserts
@@ -100,3 +102,10 @@ export const agentListResponseSchema = z.strictObject({
   agents: z.array(agentResponseSchema),
 });
 export type AgentListResponse = z.infer<typeof agentListResponseSchema>;
+
+export const agentVersionListResponseSchema = z.strictObject({
+  versions: z.array(agentVersionResponseSchema),
+});
+export type AgentVersionListResponse = z.infer<
+  typeof agentVersionListResponseSchema
+>;
