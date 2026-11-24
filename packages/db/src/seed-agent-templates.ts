@@ -1,7 +1,7 @@
 import { agentParamsSchema, agentToolsSchema } from "@middleware/contracts";
 import { agentTemplate } from "./schema/index.ts";
 
-import type { SeedStep } from "./seed.ts";
+import type { SeedStep } from "./seed-step.ts";
 
 /**
  * The six templates MIDDLEWARE_MASTER.md names for WP-21. Ids are fixed so the

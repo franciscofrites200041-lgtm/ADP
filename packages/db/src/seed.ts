@@ -4,16 +4,10 @@ import postgres from "postgres";
 import type { DbClient } from "./client.ts";
 import * as schema from "./schema/index.ts";
 import { seedAgentTemplates } from "./seed-agent-templates.ts";
+import type { SeedStep } from "./seed-step.ts";
 
-/**
- * A single idempotent seed write. Re-running a step must never duplicate
- * rows (e.g. `insert ... onConflictDoNothing`); the registry guarantees the
- * full seed is safe to run more than once.
- */
-export interface SeedStep {
-  readonly name: string;
-  run(db: DbClient): Promise<void>;
-}
+// Re-exported so existing consumers keep importing the type from here.
+export type { SeedStep };
 
 /**
  * Ordered registry of idempotent seed steps.
