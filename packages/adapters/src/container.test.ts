@@ -78,6 +78,8 @@ describe("createContainer configuration", () => {
       expect(container.runRepo).toBeDefined();
       expect(container.runEventStore).toBeDefined();
       expect(container.backgroundTasks).toBeDefined();
+      // The agent loop behind its port, over the shared guard and client.
+      expect(typeof container.agentRuntime.streamTurn).toBe("function");
       const seen: number[] = [];
       const unsubscribe = container.liveEventBus.subscribe("run-1", (m) => {
         seen.push(m.seq);

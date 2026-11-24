@@ -5,6 +5,7 @@ export * from "./domain/errors.ts";
 export type * from "./domain/run.ts";
 export type * from "./domain/usage.ts";
 export type * from "./ports/agent-repo.ts";
+export type * from "./ports/agent-runtime.ts";
 export type * from "./ports/audit-log.ts";
 export type * from "./ports/background-tasks.ts";
 export type * from "./ports/clock.ts";

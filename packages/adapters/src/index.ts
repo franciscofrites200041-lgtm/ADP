@@ -1,4 +1,5 @@
 export * from "./agent-repo.ts";
+export * from "./agent-runtime.ts";
 export * from "./audit-log-repo.ts";
 export * from "./background-tasks.ts";
 export * from "./container.ts";

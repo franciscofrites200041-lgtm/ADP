@@ -1,4 +1,5 @@
 import type {
+  AgentRuntime,
   BackgroundTasks,
   ConversationRepo,
   LiveEventBus,
@@ -13,6 +14,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { z } from "zod";
 
+import { createPiAgentRuntime } from "./agent-runtime.ts";
 import { createBackgroundTasks } from "./background-tasks.ts";
 import { createConversationRepo } from "./conversation-repo.ts";
 import { createHttpCredentialProbe } from "./credential-probe.ts";
@@ -60,6 +62,11 @@ export type Container = {
   readonly usageRepo: UsageRepo;
   /** In-process fan-out to the request that started a run (S4). */
   readonly liveEventBus: LiveEventBus;
+  /**
+   * The agent loop behind its port (S3), wired to the same guard and
+   * pinned-address client the gateway uses; one fresh turn per call.
+   */
+  readonly agentRuntime: AgentRuntime;
   /** Registered promises the process drains on shutdown (S2). */
   readonly backgroundTasks: BackgroundTasks;
   /** Ends the database pool. Safe to call more than once. */
@@ -114,6 +121,7 @@ export async function createContainer(
     messageRepo: createMessageRepo(db),
     usageRepo: createUsageRepo(db),
     liveEventBus: createInMemoryLiveEventBus(),
+    agentRuntime: createPiAgentRuntime({ urlGuard, safeFetch }),
     backgroundTasks: createBackgroundTasks(),
     workspaceKeys: createWorkspaceKeyVault(sql, keyring),
     urlGuard,
