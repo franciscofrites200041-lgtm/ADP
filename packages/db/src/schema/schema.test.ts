@@ -183,6 +183,9 @@ const spec: Record<string, TableSpec> = {
       "queued_at",
       "started_at",
       "finished_at",
+      "turns_completed",
+      "checkpoint",
+      "lease_until",
     ],
     indexes: [
       ["workspace_id"],
@@ -190,6 +193,7 @@ const spec: Record<string, TableSpec> = {
       ["conversation_id", "queued_at"],
       ["root_run_id"],
       ["group_id", "queued_at"],
+      ["lease_until"],
     ],
     uniques: [["workspace_id", "idempotency_key"]],
     primaryKeys: [["id"]],

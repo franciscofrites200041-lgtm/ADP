@@ -63,6 +63,11 @@ export const run = pgTable(
       .defaultNow(),
     startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
+    // Execution engine (§5): the last completed turn, the resumable state and
+    // the liveness lease of the process holding the run (§2, §5, §6).
+    turnsCompleted: integer("turns_completed").notNull().default(0),
+    checkpoint: jsonb("checkpoint"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
   },
   (table) => [
     index("run_workspace_id_idx").on(table.workspaceId),
@@ -73,6 +78,8 @@ export const run = pgTable(
     ),
     index("run_root_run_id_idx").on(table.rootRunId),
     index("run_group_id_queued_at_idx").on(table.groupId, table.queuedAt),
+    // Finds orphaned runs whose lease expired without a terminal state.
+    index("run_lease_until_idx").on(table.leaseUntil),
     // NULL idempotency_key rows are distinct in Postgres, so this enforces
     // uniqueness only when a key is present (matching §7).
     unique("run_workspace_id_idempotency_key_unique").on(
