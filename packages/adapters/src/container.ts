@@ -1,9 +1,12 @@
 import type {
   BackgroundTasks,
+  ConversationRepo,
   LiveEventBus,
+  MessageRepo,
   RunEventStore,
   RunRepo,
   UrlGuard,
+  UsageRepo,
 } from "@middleware/core";
 import { schema } from "@middleware/db";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -11,14 +14,17 @@ import postgres from "postgres";
 import { z } from "zod";
 
 import { createBackgroundTasks } from "./background-tasks.ts";
+import { createConversationRepo } from "./conversation-repo.ts";
 import { createHttpCredentialProbe } from "./credential-probe.ts";
 import { type Keyring, keyringFromEnv } from "./envelope.ts";
 import { createInMemoryLiveEventBus } from "./live-event-bus.ts";
+import { createMessageRepo } from "./message-repo.ts";
 import { assertNoProviderKeys } from "./provider-env.ts";
 import { createRunEventStore } from "./run-event-store.ts";
 import { createRunRepo } from "./run-repo.ts";
 import { createSafeFetch } from "./safe-fetch.ts";
 import { createUrlGuard } from "./url-guard.ts";
+import { createUsageRepo } from "./usage-repo.ts";
 import { createWorkspaceKeyVault } from "./workspace-key-vault.ts";
 
 /** Configuration every process that builds the container must provide. */
@@ -48,6 +54,10 @@ export type Container = {
   /** Run repos over the same pool as `sql`; one pool, one `close` (§5). */
   readonly runRepo: RunRepo;
   readonly runEventStore: RunEventStore;
+  /** Conversation storage of the chat MVP (S7, S11); same pool. */
+  readonly conversationRepo: ConversationRepo;
+  readonly messageRepo: MessageRepo;
+  readonly usageRepo: UsageRepo;
   /** In-process fan-out to the request that started a run (S4). */
   readonly liveEventBus: LiveEventBus;
   /** Registered promises the process drains on shutdown (S2). */
@@ -100,6 +110,9 @@ export async function createContainer(
   const container = {
     runRepo: createRunRepo(db),
     runEventStore: createRunEventStore(db),
+    conversationRepo: createConversationRepo(db),
+    messageRepo: createMessageRepo(db),
+    usageRepo: createUsageRepo(db),
     liveEventBus: createInMemoryLiveEventBus(),
     backgroundTasks: createBackgroundTasks(),
     workspaceKeys: createWorkspaceKeyVault(sql, keyring),
