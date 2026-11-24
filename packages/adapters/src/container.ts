@@ -1,10 +1,22 @@
-import type { UrlGuard } from "@middleware/core";
+import type {
+  BackgroundTasks,
+  LiveEventBus,
+  RunEventStore,
+  RunRepo,
+  UrlGuard,
+} from "@middleware/core";
+import { schema } from "@middleware/db";
+import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { z } from "zod";
 
+import { createBackgroundTasks } from "./background-tasks.ts";
 import { createHttpCredentialProbe } from "./credential-probe.ts";
 import { type Keyring, keyringFromEnv } from "./envelope.ts";
+import { createInMemoryLiveEventBus } from "./live-event-bus.ts";
 import { assertNoProviderKeys } from "./provider-env.ts";
+import { createRunEventStore } from "./run-event-store.ts";
+import { createRunRepo } from "./run-repo.ts";
 import { createSafeFetch } from "./safe-fetch.ts";
 import { createUrlGuard } from "./url-guard.ts";
 import { createWorkspaceKeyVault } from "./workspace-key-vault.ts";
@@ -33,6 +45,13 @@ export type Container = {
    * above, so a stored base URL never leaves through a raw fetch (S5).
    */
   readonly credentialProbe: ReturnType<typeof createHttpCredentialProbe>;
+  /** Run repos over the same pool as `sql`; one pool, one `close` (§5). */
+  readonly runRepo: RunRepo;
+  readonly runEventStore: RunEventStore;
+  /** In-process fan-out to the request that started a run (S4). */
+  readonly liveEventBus: LiveEventBus;
+  /** Registered promises the process drains on shutdown (S2). */
+  readonly backgroundTasks: BackgroundTasks;
   /** Ends the database pool. Safe to call more than once. */
   readonly close: () => Promise<void>;
 };
@@ -70,12 +89,19 @@ export async function createContainer(
   const keyring = keyringFromEnv(parsed.data);
   // postgres.js connects lazily, on the first query.
   const sql = postgres(parsed.data.DATABASE_URL);
+  // The run plumbing (T3/T5) shares this pool: repos take `sql`, so closing
+  // the container ends the connections exactly once.
+  const db = drizzle(sql, { schema });
   let closing: Promise<void> | undefined;
   // One guard and one client per process; both hold no secrets, so they can
   // stay enumerable (unlike `env`, `keyring` and `sql` below).
   const urlGuard = createUrlGuard();
   const safeFetch = createSafeFetch({ guard: urlGuard });
   const container = {
+    runRepo: createRunRepo(db),
+    runEventStore: createRunEventStore(db),
+    liveEventBus: createInMemoryLiveEventBus(),
+    backgroundTasks: createBackgroundTasks(),
     workspaceKeys: createWorkspaceKeyVault(sql, keyring),
     urlGuard,
     safeFetch,

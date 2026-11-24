@@ -72,6 +72,32 @@ describe("createContainer configuration", () => {
     expect(String(error)).not.toContain("hunter2");
   });
 
+  it("exposes the run plumbing (ports of WP-30's engine)", async () => {
+    const container = await createContainer(validEnv);
+    try {
+      expect(container.runRepo).toBeDefined();
+      expect(container.runEventStore).toBeDefined();
+      expect(container.backgroundTasks).toBeDefined();
+      const seen: number[] = [];
+      const unsubscribe = container.liveEventBus.subscribe("run-1", (m) => {
+        seen.push(m.seq);
+      });
+      container.liveEventBus.publish("run-1", {
+        seq: 1,
+        event: { type: "run.cancelled" },
+      });
+      unsubscribe();
+      container.liveEventBus.publish("run-1", {
+        seq: 2,
+        event: { type: "run.cancelled" },
+      });
+      expect(seen).toEqual([1]);
+      expect(await container.backgroundTasks.drain(100)).toBe(true);
+    } finally {
+      await container.close();
+    }
+  });
+
   it("rejects a missing or empty DATABASE_URL", async () => {
     const { DATABASE_URL: _omit, ...missingUrl } = validEnv;
     for (const env of [missingUrl, { ...validEnv, DATABASE_URL: "" }]) {

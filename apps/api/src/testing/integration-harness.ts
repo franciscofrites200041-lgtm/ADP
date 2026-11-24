@@ -207,9 +207,20 @@ export async function createIntegrationHarness(
   }
 
   async function close() {
-    // No foreign keys point at the workspace from these three tables.
     for (const id of workspaceIds) {
-      // Children first: agent_version points at both the agent and the credential.
+      // Children first: run rows carry FKs to agent, agent_version and the
+      // tables below, so the run family goes before the agent family.
+      await sql`update schedule set last_run_id = null
+        where workspace_id = ${id}`;
+      await sql`delete from run_event where workspace_id = ${id}`;
+      await sql`delete from approval where workspace_id = ${id}`;
+      await sql`delete from tool_call where workspace_id = ${id}`;
+      await sql`delete from usage_record where workspace_id = ${id}`;
+      await sql`delete from delivery where workspace_id = ${id}`;
+      await sql`delete from message where workspace_id = ${id}`;
+      await sql`delete from run where workspace_id = ${id}`;
+      await sql`delete from conversation where workspace_id = ${id}`;
+      // Children first: agent_version points at agent and credential.
       await sql`delete from agent_version where workspace_id = ${id}`;
       await sql`delete from agent where workspace_id = ${id}`;
       await sql`delete from provider_credential where workspace_id = ${id}`;

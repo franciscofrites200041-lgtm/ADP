@@ -76,7 +76,21 @@ cross-tenant.
 
 | # | Tarea | Specs | Ruta | Commit |
 | --- | --- | --- | --- | --- |
-| pendiente | completar tras el mapa del motor | | | |
+| T1 | Contratos del motor: eventos SSE, ejecuciones, conversaciones y mensajes | S8, S11 | `packages/contracts/src` | |
+| T2 | Migración aditiva: `turns_completed`, `checkpoint`, `lease_until` en `run` | S5, S10 | `packages/db/drizzle` | |
+| T3 | Puertos: `RunEventStore`, `LiveEventBus`, `BackgroundTasks` y repos de ejecución | S2, S4 | `packages/core/src/ports` | |
+| T4 | Casos de uso `startRun` y `executeRun`: turnos, checkpoint, límites y cierre | S3, S5, S7, S10 | `packages/core/src/usecases/runs.ts` | |
+| T5 | Adaptadores: repos Drizzle, event store con `seq`, bus en memoria, background tasks | S4 | `packages/adapters/src` | |
+| T6 | `POST /api/runs` que responde con el stream SSE (D15) | S1 | `apps/api/src/run-routes.ts` | |
+| T7 | `GET /api/runs/:id/events` con `Last-Event-ID`, cancelación y listado | S6, S11 | `apps/api/src/run-routes.ts` | |
+| T8 | Verificación independiente contra §8 y §13 (riesgo alto) | — | — | |
+
+Decisión resuelta: se adopta `@earendil-works/pi-agent-core@1.1.0`, versión exacta.
+Verificado contra el registro: existe y declara `@earendil-works/pi-ai: ^1.1.0`,
+la misma línea que el repo tiene pinneada, así que no fuerza un salto de `pi-ai`.
+Aporta el bucle de agente con ejecución de herramientas y streaming de eventos;
+escribirlo a mano sería reimplementar lo que el maestro ya eligió. El
+`checkpoint`, el `seq` y los límites siguen siendo nuestros.
 
 ## Log
 
