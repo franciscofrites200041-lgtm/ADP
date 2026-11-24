@@ -8,5 +8,7 @@ export * from "./envelope.ts";
 export * from "./model-cache.ts";
 export * from "./pi-model-gateway.ts";
 export * from "./provider-env.ts";
+export * from "./safe-fetch.ts";
 export * from "./system-ports.ts";
+export * from "./url-guard.ts";
 export * from "./workspace-key-vault.ts";
