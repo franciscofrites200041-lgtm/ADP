@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { inspect } from "node:util";
+import { ForbiddenUrlError } from "@middleware/core";
 import { describe, expect, it } from "vitest";
 
 import { ContainerConfigError, createContainer } from "./container.ts";
@@ -78,6 +79,19 @@ describe("createContainer configuration", () => {
         code: "INVALID_CONFIG",
         fields: ["DATABASE_URL"],
       });
+    }
+  });
+
+  it("wires one SSRF guard and a safe fetch built over it", async () => {
+    const container = await createContainer(validEnv);
+    try {
+      expect(typeof container.safeFetch).toBe("function");
+      // No connection is attempted: the scheme is refused before DNS.
+      await expect(
+        container.urlGuard.assertAllowed("http://127.0.0.1:8080/v1"),
+      ).rejects.toBeInstanceOf(ForbiddenUrlError);
+    } finally {
+      await container.close();
     }
   });
 });

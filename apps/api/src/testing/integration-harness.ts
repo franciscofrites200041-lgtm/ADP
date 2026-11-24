@@ -107,6 +107,9 @@ async function composeApp(
     auditLog: createAuditLogRepo(db),
     clock: createSystemClock(),
     idGen,
+    // The container's guard approves base URLs before storage, exactly like
+    // production (S5).
+    urlGuard: container.urlGuard,
   });
   const models = createModelService({
     credentialRepo: createCredentialRepo(db),
@@ -114,8 +117,13 @@ async function composeApp(
       container.sql,
       container.workspaceKeys,
     ),
-    // pi-ai answers from its catalog without network access.
-    modelGateway: createPiModelGateway(),
+    // pi-ai answers from its catalog without network access; compatible base
+    // URLs go through the container's single SSRF guard and pinned client,
+    // exactly as production (S5).
+    modelGateway: createPiModelGateway({
+      urlGuard: container.urlGuard,
+      safeFetch: container.safeFetch,
+    }),
     modelCache: createInMemoryModelCache(),
     clock: createSystemClock(),
   });

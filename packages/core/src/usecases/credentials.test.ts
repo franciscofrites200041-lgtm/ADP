@@ -2,13 +2,13 @@ import type { CreateCredentialRequest } from "@middleware/contracts";
 import { describe, expect, it } from "vitest";
 
 import { AliasTakenError, NotFoundError } from "../domain/errors.ts";
+import type { UrlGuard } from "../ports/url-guard.ts";
+import { ForbiddenUrlError } from "../security/forbidden-url-error.ts";
 import { createInMemoryPorts } from "../testing/in-memory-ports.ts";
 import { createCredentialService } from "./credentials.ts";
 
 const workspaceA = "0190a5f2-0000-7000-8000-00000000000a";
-const workspaceB = "0190a5f2-0000-7000-8000-00000000000b";
 const userA = "0190a5f2-0000-7000-8000-0000000000a1";
-const userB = "0190a5f2-0000-7000-8000-0000000000b1";
 const apiKey = "sk-test-secret-9f3k";
 
 const request = (alias: string): CreateCredentialRequest => ({
@@ -58,15 +58,6 @@ describe("createCredential", () => {
     ).rejects.toBeInstanceOf(AliasTakenError);
   });
 
-  it("allows the same alias in another workspace", async () => {
-    const { service } = setup();
-    await service.createCredential(workspaceA, userA, request("Personal"));
-
-    await expect(
-      service.createCredential(workspaceB, userB, request("Personal")),
-    ).resolves.toMatchObject({ alias: "Personal" });
-  });
-
   it("allows an alias again once its credential is archived", async () => {
     const { service } = setup();
     const first = await service.createCredential(
@@ -100,7 +91,6 @@ describe("listCredentials", () => {
       userA,
       request("Newer"),
     );
-    await service.createCredential(workspaceB, userB, request("Other"));
     await service.archiveCredential(workspaceA, userA, archived.id);
 
     await expect(service.listCredentials(workspaceA)).resolves.toEqual([
@@ -110,26 +100,8 @@ describe("listCredentials", () => {
   });
 });
 
-describe("cross-tenant access (S4)", () => {
-  it("hides another workspace's credential from rename and archive", async () => {
-    const { service } = setup();
-    const owned = await service.createCredential(
-      workspaceA,
-      userA,
-      request("Personal"),
-    );
-
-    await expect(
-      service.renameCredential(workspaceB, userB, owned.id, {
-        alias: "Stolen",
-      }),
-    ).rejects.toBeInstanceOf(NotFoundError);
-    await expect(
-      service.archiveCredential(workspaceB, userB, owned.id),
-    ).rejects.toBeInstanceOf(NotFoundError);
-    await expect(service.listCredentials(workspaceA)).resolves.toEqual([owned]);
-  });
-});
+// The S4 proof against real Postgres lives in
+// apps/api/src/credentials.integration.test.ts; this is the use-case contract.
 
 describe("audit log (S2)", () => {
   it("records create, rename and archive without the key", async () => {
@@ -224,25 +196,75 @@ describe("testCredential", () => {
     expect(stored.status).toBe("invalid");
   });
 
-  it("does not let another workspace test the credential", async () => {
-    const { service, probed } = setupWith({ status: "valid" });
-    const created = await service.createCredential(
-      workspaceA,
-      userA,
-      request("Personal"),
-    );
-
-    await expect(
-      service.testCredential(workspaceB, userB, created.id),
-    ).rejects.toBeInstanceOf(NotFoundError);
-    expect(probed).toEqual([]);
-  });
-
   it("treats an unknown credential as missing", async () => {
     const { service } = setupWith({ status: "valid" });
 
     await expect(
       service.testCredential(workspaceA, userA, crypto.randomUUID()),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("createCredential with a baseUrl (S5)", () => {
+  const compatibleRequest = (baseUrl: string): CreateCredentialRequest => ({
+    providerId: "openai-compatible",
+    alias: "Compatible",
+    apiKey,
+    baseUrl,
+  });
+
+  // A stub is enough here: the real DNS-pinning guard belongs to the
+  // adapters tests; the use case only owns the "validate before storing"
+  // ordering, which any guard stub makes observable.
+  const guardAllowing = (): UrlGuard => ({
+    assertAllowed: async (rawUrl) => ({
+      url: new URL(rawUrl),
+      addresses: ["93.184.216.34"],
+    }),
+  });
+
+  const guardRefusing = (): UrlGuard => ({
+    assertAllowed: async () => {
+      throw new ForbiddenUrlError("private");
+    },
+  });
+
+  it("stores a credential whose baseUrl the guard approves", async () => {
+    const ports = createInMemoryPorts();
+    const service = createCredentialService({
+      ...ports.deps,
+      urlGuard: guardAllowing(),
+    });
+
+    const created = await service.createCredential(
+      workspaceA,
+      userA,
+      compatibleRequest("https://llm.example.com/v1"),
+    );
+
+    expect(created).toMatchObject({
+      providerId: "openai-compatible",
+      baseUrl: "https://llm.example.com/v1",
+    });
+    expect(ports.auditEntries).toHaveLength(1);
+  });
+
+  it("writes nothing and records no audit when the guard refuses", async () => {
+    const ports = createInMemoryPorts();
+    const service = createCredentialService({
+      ...ports.deps,
+      urlGuard: guardRefusing(),
+    });
+
+    await expect(
+      service.createCredential(
+        workspaceA,
+        userA,
+        compatibleRequest("https://169.254.169.254/v1"),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenUrlError);
+
+    expect(ports.rows).toEqual([]);
+    expect(ports.auditEntries).toEqual([]);
   });
 });

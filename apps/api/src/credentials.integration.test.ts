@@ -109,6 +109,20 @@ describe.skipIf(!url)("credential routes against postgres", () => {
     expect(await res.json()).toEqual({ providers: providerCatalog });
   });
 
+  it("serves the same catalog to every workspace, with no tenant data", async () => {
+    // The catalog is the one global read in the API (§8): two workspaces must
+    // see exactly the same list and nothing about who asked.
+    const fromAna = await call(ana, "GET", "/api/providers");
+    const fromBeto = await call(beto, "GET", "/api/providers");
+    // A response body is readable once, so read both before comparing.
+    const anaBody: unknown = await fromAna.json();
+    const betoBody: unknown = await fromBeto.json();
+
+    expect(fromAna.status).toBe(200);
+    expect(anaBody).toEqual(betoBody);
+    expect(anaBody).not.toHaveProperty("workspaceId");
+  });
+
   it("creates, lists and renames without returning the key", async () => {
     const created = await create(ana, "personal");
 
@@ -223,6 +237,40 @@ describe.skipIf(!url)("credential routes against postgres", () => {
       const anaAliases = (await list(ana)).map((c) => c.alias);
       expect(anaAliases).not.toContain("planted");
       expect(anaAliases).toContain("ana-query");
+    });
+  });
+
+  describe("SSRF policy (S5)", () => {
+    const countRows = async (workspaceId: string) => {
+      const rows = await harness.sql`
+        select count(*)::int as n from provider_credential
+        where workspace_id = ${workspaceId}`;
+      return rows[0]?.n;
+    };
+
+    it("writes nothing when the guard refuses the credential's baseUrl", async () => {
+      // The real guard refuses the metadata host without any DNS lookup.
+      const before = await countRows(ana.workspaceId);
+      if (before === undefined) throw new Error("count query returned no row");
+
+      const res = await call(ana, "POST", "/api/credentials", {
+        providerId: "openai-compatible",
+        alias: "metadata-host",
+        apiKey: "sk-compat-1234",
+        baseUrl: "https://169.254.169.254/v1",
+      });
+      // A refused host is the user's mistake, not ours: 400 with the domain
+      // code, never 500. ForbiddenUrlError extends DomainError for this.
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({
+        error: { code: "invalid_request" },
+      });
+
+      const after = await countRows(ana.workspaceId);
+      expect(after).toBe(before);
+      const planted = await harness.sql`
+        select id from provider_credential where alias = ${"metadata-host"}`;
+      expect(planted).toHaveLength(0);
     });
   });
 

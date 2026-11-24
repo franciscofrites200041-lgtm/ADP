@@ -1,8 +1,12 @@
+import type { UrlGuard } from "@middleware/core";
 import postgres from "postgres";
 import { z } from "zod";
 
+import { createHttpCredentialProbe } from "./credential-probe.ts";
 import { type Keyring, keyringFromEnv } from "./envelope.ts";
 import { assertNoProviderKeys } from "./provider-env.ts";
+import { createSafeFetch } from "./safe-fetch.ts";
+import { createUrlGuard } from "./url-guard.ts";
 import { createWorkspaceKeyVault } from "./workspace-key-vault.ts";
 
 /** Configuration every process that builds the container must provide. */
@@ -20,6 +24,15 @@ export type Container = {
   readonly keyring: Keyring;
   readonly sql: postgres.Sql;
   readonly workspaceKeys: ReturnType<typeof createWorkspaceKeyVault>;
+  /** Approves user-supplied URLs and pins their addresses (S5). */
+  readonly urlGuard: UrlGuard;
+  /** The protected HTTP client built over `urlGuard`; no secrets inside. */
+  readonly safeFetch: typeof fetch;
+  /**
+   * The credential probe, wired to the guard and the pinned-address client
+   * above, so a stored base URL never leaves through a raw fetch (S5).
+   */
+  readonly credentialProbe: ReturnType<typeof createHttpCredentialProbe>;
   /** Ends the database pool. Safe to call more than once. */
   readonly close: () => Promise<void>;
 };
@@ -58,8 +71,15 @@ export async function createContainer(
   // postgres.js connects lazily, on the first query.
   const sql = postgres(parsed.data.DATABASE_URL);
   let closing: Promise<void> | undefined;
+  // One guard and one client per process; both hold no secrets, so they can
+  // stay enumerable (unlike `env`, `keyring` and `sql` below).
+  const urlGuard = createUrlGuard();
+  const safeFetch = createSafeFetch({ guard: urlGuard });
   const container = {
     workspaceKeys: createWorkspaceKeyVault(sql, keyring),
+    urlGuard,
+    safeFetch,
+    credentialProbe: createHttpCredentialProbe({ urlGuard, safeFetch }),
     close: () => {
       closing ??= sql.end();
       return closing;

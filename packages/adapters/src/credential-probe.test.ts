@@ -1,5 +1,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import type { UrlGuard } from "@middleware/core";
+import { ForbiddenUrlError } from "@middleware/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createHttpCredentialProbe } from "./credential-probe.ts";
@@ -78,8 +80,21 @@ describe("credential probe", () => {
   });
 });
 
+const allowingGuard: UrlGuard = {
+  assertAllowed: async (rawUrl) => ({
+    url: new URL(rawUrl),
+    addresses: ["93.184.216.34"],
+  }),
+};
+
+const refusingGuard: UrlGuard = {
+  assertAllowed: async () => {
+    throw new ForbiddenUrlError("link_local");
+  },
+};
+
 describe("credential probe for user-supplied hosts", () => {
-  it("refuses to probe openai-compatible before WP-14 ships the SSRF client", async () => {
+  it("refuses to probe openai-compatible without the SSRF client (S5)", async () => {
     const probe = createHttpCredentialProbe({
       resolveEndpoint: () => {
         throw new Error("the probe must not resolve a user-supplied host");
@@ -93,5 +108,84 @@ describe("credential probe for user-supplied hosts", () => {
         baseUrl: "https://attacker.example/v1",
       }),
     ).resolves.toEqual({ status: "invalid", code: "unsupported_provider" });
+  });
+
+  it("probes a wired compatible endpoint through the guarded client", async () => {
+    const seen: { url: string; authorization: string | undefined }[] = [];
+    const probe = createHttpCredentialProbe({
+      urlGuard: allowingGuard,
+      safeFetch: async (input, init) => {
+        seen.push({
+          url: String(input),
+          authorization:
+            new Headers(init?.headers).get("authorization") ?? undefined,
+        });
+        return new Response("{}", { status: 200 });
+      },
+    });
+
+    const result = await probe.probe({
+      providerId: "openai-compatible",
+      apiKey,
+      baseUrl: "https://compatible.example/v1",
+    });
+
+    expect(result).toEqual({ status: "valid" });
+    expect(seen).toEqual([
+      {
+        url: "https://compatible.example/v1/models",
+        authorization: `Bearer ${apiKey}`,
+      },
+    ]);
+  });
+
+  it("refuses a base URL the guard rejects before connecting (S5)", async () => {
+    const probe = createHttpCredentialProbe({
+      urlGuard: refusingGuard,
+      safeFetch: async () => {
+        throw new Error("the probe must not contact a refused URL");
+      },
+    });
+
+    await expect(
+      probe.probe({
+        providerId: "openai-compatible",
+        apiKey,
+        baseUrl: "https://169.254.169.254/v1",
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenUrlError);
+  });
+
+  it("reports an unreachable compatible endpoint without the key (S2)", async () => {
+    const probe = createHttpCredentialProbe({
+      urlGuard: allowingGuard,
+      safeFetch: async () => {
+        throw new Error("connection refused");
+      },
+    });
+
+    const result = await probe.probe({
+      providerId: "openai-compatible",
+      apiKey,
+      baseUrl: "https://compatible.example/v1",
+    });
+
+    expect(result).toEqual({ status: "invalid", code: "provider_unreachable" });
+    expect(JSON.stringify(result)).not.toContain(apiKey);
+  });
+
+  it("maps a compatible endpoint's 401 to invalid_key", async () => {
+    const probe = createHttpCredentialProbe({
+      urlGuard: allowingGuard,
+      safeFetch: async () => new Response("{}", { status: 401 }),
+    });
+
+    await expect(
+      probe.probe({
+        providerId: "openai-compatible",
+        apiKey,
+        baseUrl: "https://compatible.example/v1",
+      }),
+    ).resolves.toEqual({ status: "invalid", code: "invalid_key" });
   });
 });

@@ -13,6 +13,7 @@ import type { CredentialProbe } from "../ports/credential-probe.ts";
 import type { CredentialRepo } from "../ports/credential-repo.ts";
 import type { IdGen } from "../ports/id-gen.ts";
 import type { SecretVault } from "../ports/secret-vault.ts";
+import type { UrlGuard } from "../ports/url-guard.ts";
 
 const TABLE = "provider_credential";
 
@@ -23,6 +24,12 @@ export type CredentialServiceDeps = {
   auditLog: AuditLog;
   clock: Clock;
   idGen: IdGen;
+  /**
+   * Approves a credential's `baseUrl` before anything is stored (S5).
+   * Required, never optional: an optional security check is one that will be
+   * forgotten.
+   */
+  urlGuard: UrlGuard;
 };
 
 /** `workspaceId` and `actorUserId` come from the session, never the request (S4). */
@@ -74,6 +81,7 @@ export function createCredentialService({
   auditLog,
   clock,
   idGen,
+  urlGuard,
 }: CredentialServiceDeps): CredentialService {
   const audit = (
     workspaceId: string,
@@ -92,6 +100,13 @@ export function createCredentialService({
 
   return {
     async createCredential(workspaceId, actorUserId, input) {
+      // The URL is validated before anything exists: no id, no sealed secret,
+      // no row and no audit entry survive a refused base URL (S5).
+      if (input.baseUrl !== undefined) {
+        // `ForbiddenUrlError` propagates and aborts the create with nothing
+        // written and no audit row (S5).
+        await urlGuard.assertAllowed(input.baseUrl);
+      }
       const id = idGen.newId();
       const secret = await secretVault.seal(
         workspaceId,

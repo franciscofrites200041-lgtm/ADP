@@ -6,7 +6,6 @@ import {
   createContainer,
   createCredentialRepo,
   createCredentialSecretVault,
-  createHttpCredentialProbe,
   createInMemoryModelCache,
   createPiModelGateway,
   createSystemClock,
@@ -48,7 +47,9 @@ const auth = createAuth({
 });
 const credentials = createCredentialService({
   credentialRepo: createCredentialRepo(dbClient),
-  credentialProbe: createHttpCredentialProbe(),
+  // Built in the container over the guard and the pinned-address client, so a
+  // stored base URL can never leave through an unprotected fetch (S5).
+  credentialProbe: container.credentialProbe,
   secretVault: createCredentialSecretVault(
     container.sql,
     container.workspaceKeys,
@@ -56,6 +57,8 @@ const credentials = createCredentialService({
   auditLog: createAuditLogRepo(dbClient),
   clock: createSystemClock(),
   idGen: createUuidV7IdGen(),
+  // Compatible base URLs are approved before anything is stored (S5).
+  urlGuard: container.urlGuard,
 });
 const models = createModelService({
   credentialRepo: createCredentialRepo(dbClient),
@@ -63,7 +66,12 @@ const models = createModelService({
     container.sql,
     container.workspaceKeys,
   ),
-  modelGateway: createPiModelGateway(),
+  // Compatible base URLs go through the SSRF guard and the pinned-address
+  // client (S5); every other provider keeps its catalog path.
+  modelGateway: createPiModelGateway({
+    urlGuard: container.urlGuard,
+    safeFetch: container.safeFetch,
+  }),
   modelCache: createInMemoryModelCache(),
   clock: createSystemClock(),
 });

@@ -6,28 +6,33 @@ import {
   type CredentialStore,
   calculateCost,
   createModels,
+  createProvider,
   type Model,
   type MutableModels,
   type Provider as PiProvider,
+  type ProviderAuth,
 } from "@earendil-works/pi-ai";
+import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
+import type { ModelDescriptor } from "@middleware/contracts";
 import type {
   ModelCredential,
   ModelGateway,
   ModelTarget,
   ProviderStreamEvent,
+  UrlGuard,
 } from "@middleware/core";
-import { ProviderError } from "@middleware/core";
+import { DomainError, ProviderError } from "@middleware/core";
+import { z } from "zod";
 
 /**
  * Our provider ids → pi-ai provider ids, in one object: adding a provider is
  * one line, and the compiler forces the line (a new id in the contract makes
  * every lookup stop typechecking until the registry has it).
  *
- * "openai-compatible" is mapped but resolves to no provider until WP-14 wires
- * its per-credential `baseUrl` construction behind the SSRF-safe HTTP client
- * (§8): until then it lists no models and streaming it fails with
- * `model_not_found`.
+ * "openai-compatible" resolves to a provider synthesized from the credential's
+ * `baseUrl`, built only after the injected `UrlGuard` approves the URL and
+ * contacted only through the injected safe fetch (§8).
  */
 const PI_PROVIDER_IDS = {
   openai: "openai",
@@ -127,6 +132,55 @@ function providerErrorFromFailure(failure: AssistantMessage): ProviderError {
   return providerError(mapProviderErrorCode(message));
 }
 
+/** Catalog defaults for compatible endpoints, which advertise no limits. */
+const COMPAT_CONTEXT_WINDOW = 128_000;
+const COMPAT_MAX_TOKENS = 16_384;
+
+/**
+ * Auth for the synthesized compatible provider: it resolves only from the
+ * per-execution credential store, never from the environment (S3).
+ */
+const COMPAT_AUTH: ProviderAuth = {
+  apiKey: {
+    name: "Compatible API key",
+    resolve: async ({ credential, signal }) => {
+      signal.throwIfAborted();
+      const key = credential?.key;
+      if (key === undefined || key === "") return undefined;
+      return { auth: { apiKey: key }, source: "stored credential" };
+    },
+  },
+};
+
+/** The synthesized chat model: one per requested id, bound to the base URL. */
+function synthesizeCompatibleModel(
+  modelId: string,
+  baseUrl: string,
+): PiChatModel {
+  return {
+    id: modelId,
+    name: modelId,
+    api: "openai-completions",
+    provider: "openai-compatible",
+    baseUrl,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    reasoning: false,
+    contextWindow: COMPAT_CONTEXT_WINDOW,
+    maxTokens: COMPAT_MAX_TOKENS,
+  };
+}
+
+/**
+ * The per-execution store is an in-call read-only view (S3); a write to it is
+ * a programming error, never a user-facing outcome (§10: `unknown`).
+ */
+class ReadOnlyCredentialStoreError extends DomainError {
+  constructor() {
+    super("unknown", "The per-execution credential store is read-only");
+  }
+}
+
 /**
  * A credential store that holds exactly one credential, alive only for one
  * gateway call: one `Models` per execution, never shared (S3). Read-only,
@@ -148,10 +202,10 @@ function singleCredentialStore(
       return [{ providerId: piProviderId, type: "api_key" }];
     },
     async modify() {
-      throw new Error("The per-execution credential store is read-only");
+      throw new ReadOnlyCredentialStoreError();
     },
     async delete() {
-      throw new Error("The per-execution credential store is read-only");
+      throw new ReadOnlyCredentialStoreError();
     },
   };
 }
@@ -170,23 +224,122 @@ function toModelDescriptor(providerId: OurProviderId, model: PiChatModel) {
 }
 
 /**
+ * An OpenAI-compatible `/models` body, at the boundary (AGENTS: validate with
+ * Zod at every edge). Only the ids matter; anything else is dropped, and any
+ * malformation, including one bad entry, empties the catalog like the hand
+ * written checks did.
+ */
+const compatibleModelsBody = z.object({
+  data: z.array(z.object({ id: z.string().min(1) })),
+});
+
+/** The ids of an OpenAI-compatible `/models` body, or [] when malformed. */
+function extractCompatibleModelIds(body: unknown): string[] {
+  const parsed = compatibleModelsBody.safeParse(body);
+  return parsed.success ? parsed.data.data.map((model) => model.id) : [];
+}
+
+/**
  * The pi-ai adapter of the `ModelGateway` port (D2): it owns every pi-ai
  * touchpoint, builds a fresh `Models` per call that holds only that call's
  * credential, and passes the api key explicitly so nothing is ever read from
  * the environment (S3).
  */
 export function createPiModelGateway(
-  options: { listProviders?: () => readonly PiProvider[] } = {},
+  options: {
+    listProviders?: () => readonly PiProvider[];
+    /** Approves a compatible credential's `baseUrl` before any connection. */
+    urlGuard?: UrlGuard;
+    /** The pinned-address client every compatible request must go through. */
+    safeFetch?: typeof fetch;
+  } = {},
 ): ModelGateway {
   // Provider objects are pi-ai's immutable catalogs, safe to share; only the
   // Models collection and its credential store are per call.
   const piProviders = options.listProviders
     ? options.listProviders()
     : builtinProviders();
+  const { urlGuard, safeFetch } = options;
 
-  const piProviderFor = (providerId: OurProviderId): PiProvider | undefined => {
+  // One provider per base URL: its catalog is empty (models are synthesized
+  // per request), so it is immutable and safe to reuse across calls.
+  const compatibleProviders = new Map<string, PiProvider>();
+
+  const compatibleProviderFor = (baseUrl: string): PiProvider => {
+    const cached = compatibleProviders.get(baseUrl);
+    if (cached !== undefined) return cached;
+    const provider = createProvider({
+      id: "openai-compatible",
+      name: "Compatible with OpenAI",
+      baseUrl,
+      auth: COMPAT_AUTH,
+      models: [],
+      api: openAICompletionsApi(),
+    });
+    compatibleProviders.set(baseUrl, provider);
+    return provider;
+  };
+
+  const isCompatible = (providerId: OurProviderId): boolean =>
+    PI_PROVIDER_IDS[providerId] === "openai-compatible";
+
+  /** The credential's approved base URL, or undefined outside the funnel. */
+  const compatibleBaseUrlOf = (
+    providerId: OurProviderId,
+    credential: ModelCredential | undefined,
+  ): string | undefined => {
+    if (!isCompatible(providerId)) return undefined;
+    if (urlGuard === undefined || safeFetch === undefined) return undefined;
+    return credential?.baseUrl;
+  };
+
+  const piProviderFor = async (
+    providerId: OurProviderId,
+    credential?: ModelCredential,
+  ): Promise<PiProvider | undefined> => {
+    if (isCompatible(providerId)) {
+      // No base URL, no guard or no safe fetch: nothing to synthesize, the
+      // pre-WP-14 behaviour. The guard throws `ForbiddenUrlError` before any
+      // connection is possible.
+      if (urlGuard === undefined || safeFetch === undefined) return undefined;
+      const baseUrl = credential?.baseUrl;
+      if (baseUrl === undefined) return undefined;
+      await urlGuard.assertAllowed(baseUrl);
+      return compatibleProviderFor(baseUrl);
+    }
     const piId = PI_PROVIDER_IDS[providerId];
     return piProviders.find((candidate) => candidate.id === piId);
+  };
+
+  /**
+   * Discovery against the endpoint's own `/models` route, through the safe
+   * fetch. A discovery failure (non-2xx, malformed body, refused URL) is an
+   * empty catalog, never a throw: the credentials screen must stay usable.
+   */
+  const discoverCompatibleModels = async (
+    credential: ModelCredential,
+  ): Promise<ModelDescriptor[]> => {
+    const baseUrl = compatibleBaseUrlOf("openai-compatible", credential);
+    if (baseUrl === undefined || safeFetch === undefined) return [];
+    try {
+      const root = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+      const response = await safeFetch(new URL("models", root), {
+        headers: { authorization: `Bearer ${credential.apiKey}` },
+      });
+      if (!response.ok) return [];
+      const body: unknown = await response.json();
+      return extractCompatibleModelIds(body).map((id) => ({
+        id,
+        name: id,
+        providerId: "openai-compatible" as const,
+        contextWindow: COMPAT_CONTEXT_WINDOW,
+        maxTokens: COMPAT_MAX_TOKENS,
+        reasoning: false,
+      }));
+    } catch {
+      // Refused URL, unreachable host or unreadable body: an empty catalog.
+      return [];
+    }
   };
 
   const freshModels = (
@@ -207,7 +360,10 @@ export function createPiModelGateway(
 
   return {
     async listModels({ providerId, credential }) {
-      const provider = piProviderFor(providerId);
+      if (isCompatible(providerId)) {
+        return discoverCompatibleModels(credential);
+      }
+      const provider = await piProviderFor(providerId, credential);
       if (provider === undefined) {
         return [];
       }
@@ -218,7 +374,24 @@ export function createPiModelGateway(
     },
 
     findModel(providerId, modelId) {
-      const provider = piProviderFor(providerId);
+      // A compatible endpoint has no static catalog and `findModel` carries no
+      // credential (and no network): any id the server may offer is accepted,
+      // with the same defaults discovery reports.
+      if (isCompatible(providerId)) {
+        return modelId === ""
+          ? null
+          : {
+              id: modelId,
+              name: modelId,
+              providerId,
+              contextWindow: COMPAT_CONTEXT_WINDOW,
+              maxTokens: COMPAT_MAX_TOKENS,
+              reasoning: false,
+            };
+      }
+      const provider = piProviders.find(
+        (candidate) => candidate.id === PI_PROVIDER_IDS[providerId],
+      );
       if (provider === undefined) {
         return null;
       }
@@ -229,24 +402,35 @@ export function createPiModelGateway(
     },
 
     async *stream(target: ModelTarget): AsyncIterable<ProviderStreamEvent> {
-      const provider = piProviderFor(target.providerId);
+      const provider = await piProviderFor(
+        target.providerId,
+        target.credential,
+      );
       if (provider === undefined) {
         throw providerError("model_not_found");
       }
       const models = freshModels(provider, target.credential);
-      const model = models.getModel(provider.id, target.modelId);
+      const compatibleBaseUrl = compatibleBaseUrlOf(
+        target.providerId,
+        target.credential,
+      );
+      // A compatible endpoint advertises no catalog: the requested id is
+      // synthesized into a model bound to the approved base URL.
+      const model =
+        compatibleBaseUrl === undefined
+          ? models.getModel(provider.id, target.modelId)
+          : synthesizeCompatibleModel(target.modelId, compatibleBaseUrl);
       if (model === undefined) {
         throw providerError("model_not_found");
       }
       // The port's target carries no transcript yet (WP-30 brings the
-      // conversation); the key is passed explicitly, never via env (S3).
-      const events = models.stream(
-        model,
-        { messages: [] },
-        {
-          apiKey: target.credential.apiKey,
-        },
-      );
+      // conversation); the key is passed explicitly, never via env (S3). The
+      // compatible path always streams through the pinned-address client.
+      const streamOptions: { apiKey: string; fetch?: typeof fetch } = {
+        apiKey: target.credential.apiKey,
+      };
+      if (safeFetch !== undefined) streamOptions.fetch = safeFetch;
+      const events = models.stream(model, { messages: [] }, streamOptions);
       for await (const event of events) {
         if (event.type === "text_delta") {
           yield { type: "text", text: event.delta };

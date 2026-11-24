@@ -33,6 +33,12 @@ export function createInMemoryPorts() {
     `${workspaceId}:${ref.table}:${ref.id}:`;
 
   const deps: CredentialServiceDeps = {
+    // Allows everything: a test that cares about the policy injects its own.
+    urlGuard: {
+      async assertAllowed(rawUrl) {
+        return { url: new URL(rawUrl), addresses: [] };
+      },
+    },
     // Every test starts with a probe that fails loudly: a use case that forgets
     // to inject a fake cannot quietly pass.
     credentialProbe: {
