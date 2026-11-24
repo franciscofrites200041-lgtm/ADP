@@ -1,0 +1,102 @@
+name: Deploy demo
+
+# §14: the demo environment deploys automatically with every merge to main, but
+# only when CI is green. Triggering on the CI run's completion is exactly that
+# condition, without polling and without deploying a red commit.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Two deploys never overlap. Queued, not cancelled: a half-deployed environment
+# is worse than a late one.
+concurrency:
+  group: deploy-demo
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  NODE_IMAGE: ghcr.io/${{ github.repository_owner }}/adp-node
+  WEB_IMAGE: ghcr.io/${{ github.repository_owner }}/adp-web
+
+jobs:
+  images:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Build exactly the commit CI validated, not whatever main points at now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - id: tag
+        name: Tag the images with the commit
+        run: echo "tag=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        name: Build and push api and worker image
+        with:
+          context: .
+          file: infra/docker/node.Dockerfile
+          push: true
+          tags: ${{ env.NODE_IMAGE }}:${{ steps.tag.outputs.tag }}
+
+      - uses: docker/build-push-action@v6
+        name: Build and push web image
+        with:
+          context: .
+          file: infra/docker/web.Dockerfile
+          push: true
+          tags: ${{ env.WEB_IMAGE }}:${{ steps.tag.outputs.tag }}
+
+  deploy:
+    needs: images
+    runs-on: ubuntu-latest
+    environment:
+      name: demo
+      url: https://${{ vars.DEMO_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Deploy over SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          APP_DIR: ${{ vars.DEPLOY_PATH }}
+          DEMO_DOMAIN: ${{ vars.DEMO_DOMAIN }}
+          NODE_TAG: ${{ needs.images.outputs.tag }}
+          NODE_IMAGE_NAME: ${{ env.NODE_IMAGE }}
+          WEB_IMAGE_NAME: ${{ env.WEB_IMAGE }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # The compose files are deployed from the repository, so what runs is
+          # what was reviewed; the secrets are never copied.
+          scp infra/compose.prod.yaml infra/Caddyfile.prod \
+            "$DEPLOY_USER@$DEPLOY_HOST:$APP_DIR/"
+
+          # StrictHostKeyChecking is on by default now that known_hosts is seeded.
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+            "APP_DIR='$APP_DIR' DOMAIN='$DEMO_DOMAIN' NODE_IMAGE='$NODE_IMAGE_NAME:$NODE_TAG' WEB_IMAGE='$WEB_IMAGE_NAME:$NODE_TAG' bash -s" \
+            < .github/scripts/deploy-demo.sh

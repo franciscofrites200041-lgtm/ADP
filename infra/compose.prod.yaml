@@ -1,0 +1,107 @@
+# VPS topology for one environment (WP-08, §14).
+#
+# The project name is NOT set here: the deploy passes `-p mw-demo` or `-p mw-prod`
+# so the same file serves both environments, each with its own database volume,
+# its own `env` file and its own secrets. Same file, separate worlds.
+#
+# `env` holds the application secrets (infra/env.demo.example is the template).
+# `images.env` is written by the deploy and pins the two image tags, so a rollback
+# is just restoring the previous file and running `up -d` again.
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # The shell needs the container's own variables, hence the doubled dollars.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  # §14: migrations run in their own container, before api and worker.
+  # A failing migration stops the deploy here instead of half-starting the app.
+  migrate:
+    image: ${NODE_IMAGE}
+    command: ["node", "packages/db/src/cli.ts", "migrate"]
+    env_file: [env]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: ${NODE_IMAGE}
+    command: ["node", "apps/api/src/index.ts"]
+    env_file: [env]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      # No curl in the slim image: node already knows how to fetch.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/readyz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Same image as the API, different command (§5, S6).
+  worker:
+    image: ${NODE_IMAGE}
+    command: ["node", "apps/worker/src/index.ts"]
+    env_file: [env]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    image: ${WEB_IMAGE}
+    command: ["pnpm", "--filter", "@middleware/web", "start"]
+    env_file: [env]
+    environment:
+      # Inside the Compose network the API answers by service name.
+      API_INTERNAL_URL: http://api:3001
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    environment:
+      # Caddyfile.prod reads this to obtain the certificate for the subdomain.
+      APP_DOMAIN: ${APP_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

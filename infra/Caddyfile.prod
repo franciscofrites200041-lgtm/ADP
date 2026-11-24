@@ -1,0 +1,37 @@
+# Reverse proxy for the VPS (WP-08). Caddy obtains and renews the certificate
+# for {$APP_DOMAIN} by itself once DNS points at the server.
+#
+# Routing is the same as in development and the same as §5: `/api/*` and `/v1/*`
+# go to Hono, everything else goes to Next.js. One origin, so the Better Auth
+# session cookie works for both without CORS.
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	# Health endpoints stay reachable for the deploy smoke test.
+	handle /healthz {
+		reverse_proxy api:3001
+	}
+
+	handle /readyz {
+		reverse_proxy api:3001
+	}
+
+	handle /api/* {
+		reverse_proxy api:3001
+	}
+
+	handle /v1/* {
+		reverse_proxy api:3001
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	# The web is server-rendered; keep responses honest about what they are.
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
