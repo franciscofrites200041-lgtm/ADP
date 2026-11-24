@@ -20,7 +20,7 @@ export function apiErrorMessage(input: unknown, fallback: string): string {
 }
 
 /** Every error a screen can show: a Spanish message and the API code. */
-export class ClientError extends Error {
+class ClientError extends Error {
   readonly code: string;
 
   constructor(message: string, code = "unknown") {
