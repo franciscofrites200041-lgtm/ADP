@@ -17,6 +17,7 @@
     "@types/node": "24.19.2"
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "1.1.0",
     "@earendil-works/pi-ai": "1.1.0",
     "@middleware/contracts": "workspace:*",
     "@middleware/core": "workspace:*",
