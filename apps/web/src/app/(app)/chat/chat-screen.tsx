@@ -1,5 +1,6 @@
 "use client";
 
+import type { ConversationResponse } from "@middleware/contracts";
 import { Composer } from "@middleware/ui";
 import { useTranslations } from "next-intl";
 import type { ChangeEvent, FormEventHandler } from "react";
@@ -7,7 +8,8 @@ import { useState } from "react";
 
 import { AgentPicker } from "./agent-picker.tsx";
 import { ChatTranscript } from "./chat-transcript.tsx";
-import { useAgentOptions } from "./queries.ts";
+import { ConversationList } from "./conversation-list.tsx";
+import { useAgentOptions, useConversationList } from "./queries.ts";
 import { replaceUrl, useChatRun } from "./use-chat-run.ts";
 
 type ChatScreenProps = {
@@ -31,6 +33,7 @@ export function ChatScreen({
 }: ChatScreenProps) {
   const t = useTranslations("chat");
   const agents = useAgentOptions(t("agentsError"));
+  const conversations = useConversationList(t("conversationsError"));
   const [agentId, setAgentId] = useState<string | null>(initialAgent);
 
   const run = useChatRun({
@@ -59,12 +62,29 @@ export function ChatScreen({
     replaceUrl(id, null, null);
   };
 
+  /**
+   * Opens a conversation from the history (T10): its agent takes the picker
+   * and its messages load into the transcript; writing keeps appending to
+   * that same conversation.
+   */
+  const handleConversationSelect = (
+    conversation: ConversationResponse,
+  ): void => {
+    setAgentId(conversation.agentId);
+    run.openConversation(conversation);
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <AgentPicker
         agentId={agentId}
         agents={agents}
         onChange={handleAgentChange}
+      />
+      <ConversationList
+        conversations={conversations}
+        onSelect={handleConversationSelect}
+        selectedId={run.conversationId}
       />
       {agentId === null ? null : (
         <>

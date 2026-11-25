@@ -84,7 +84,9 @@ cross-tenant.
 | T6 | `POST /api/runs` que responde con el stream SSE (D15) | S1 | `apps/api/src/run-routes.ts` | |
 | T7 | `GET /api/runs/:id/events` con `Last-Event-ID`, cancelación y listado | S6, S11 | `apps/api/src/run-routes.ts` | |
 | T8 | Verificación independiente contra §8 y §13 (riesgo alto) | — | — | `bef234f` |
-| T9 | Pantalla de chat: enviar y ver la respuesta llegar; recargar a mitad de respuesta sin perder texto | S1, S6, S9, S11 | `apps/web/src/app/(app)/chat/**` | |
+| T9 | Pantalla de chat: enviar y ver la respuesta llegar; recargar a mitad de respuesta sin perder texto | S1, S6, S9, S11 | `apps/web/src/app/(app)/chat/**` | `ea0c567` |
+| T10 | Historial: servicio de conversación en core, listado y mensajes paginados en la pantalla | S11 | `packages/core/src/usecases/conversations.ts`, `apps/web/src/app/(app)/chat/**` | |
+| T11 | Smoke de navegador en CI: abre las rutas principales y falla ante el error boundary | — | `.github/workflows/ci.yml`, `tests/e2e/smoke.spec.ts` | |
 
 Decisión resuelta: se adopta `@earendil-works/pi-agent-core@1.1.0`, versión exacta.
 Verificado contra el registro: existe y declara `@earendil-works/pi-ai: ^1.1.0`,

@@ -1,5 +1,6 @@
 import type {
   AgentService,
+  ConversationService,
   CredentialService,
   ModelService,
 } from "@middleware/core";
@@ -7,7 +8,6 @@ import { Hono } from "hono";
 import type { Logger } from "pino";
 import { agentRoutes } from "./agent-routes.ts";
 import type { Auth } from "./auth.ts";
-import type { ConversationRoutesDeps } from "./conversation-routes.ts";
 import { conversationRoutes } from "./conversation-routes.ts";
 import { credentialRoutes } from "./credentials-routes.ts";
 import { createErrorHandler } from "./http-errors.ts";
@@ -31,8 +31,8 @@ export interface CreateAppOptions {
   agents?: AgentService;
   /** Run surface with its SSE streams (T6, T7); mounted with `auth`. */
   runs?: RunRoutesDeps;
-  /** Conversations and paginated history (T7, S11); mounted with `auth`. */
-  conversations?: ConversationRoutesDeps;
+  /** Conversations and paginated history (T10, S11); mounted with `auth`. */
+  conversations?: ConversationService;
   /** Origins allowed to write; defaults to none, which rejects every write. */
   allowedOrigins?: readonly string[];
   logger?: Logger;

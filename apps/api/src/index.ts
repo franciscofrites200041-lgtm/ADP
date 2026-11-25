@@ -13,6 +13,7 @@ import {
 } from "@middleware/adapters";
 import {
   createAgentService,
+  createConversationService,
   createCredentialService,
   createModelService,
   createRunService,
@@ -117,11 +118,11 @@ const app = createApp({
     eventStore: container.runEventStore,
     liveBus: container.liveEventBus,
   },
-  conversations: {
-    conversations: container.conversationRepo,
-    messages: container.messageRepo,
+  conversations: createConversationService({
+    conversationRepo: container.conversationRepo,
+    messageRepo: container.messageRepo,
     idGen,
-  },
+  }),
   allowedOrigins: [BETTER_AUTH_URL],
   logger,
 });

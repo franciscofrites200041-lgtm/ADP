@@ -18,6 +18,7 @@ import {
   type AgentRuntime,
   type CredentialProbe,
   createAgentService,
+  createConversationService,
   createCredentialService,
   createModelService,
   createRunService,
@@ -146,11 +147,11 @@ async function composeApp(
       eventStore: container.runEventStore,
       liveBus: container.liveEventBus,
     },
-    conversations: {
-      conversations: container.conversationRepo,
-      messages: container.messageRepo,
+    conversations: createConversationService({
+      conversationRepo: container.conversationRepo,
+      messageRepo: container.messageRepo,
       idGen,
-    },
+    }),
     allowedOrigins: [TEST_ORIGIN],
     logger,
   });

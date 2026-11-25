@@ -3,7 +3,9 @@
 import {
   type AgentResponse,
   agentListResponseSchema,
+  type ConversationListResponse,
   type ConversationResponse,
+  conversationListResponseSchema,
   conversationResponseSchema,
   type MessageListResponse,
   messageListResponseSchema,
@@ -65,6 +67,32 @@ export function useConversationMessages(
         fallback,
       );
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  });
+}
+
+/**
+ * The workspace's conversations, newest first (S11, T10). The cursor moves
+ * forward through the pages, so the list keeps growing with "Ver más".
+ */
+export function useConversationList(
+  fallback: string,
+): UseInfiniteQueryResult<InfiniteData<ConversationListResponse>, Error> {
+  return useInfiniteQuery({
+    queryKey: ["chat-conversations"],
+    queryFn: ({ pageParam }) => {
+      const cursor =
+        pageParam === undefined
+          ? ""
+          : `?cursor=${encodeURIComponent(pageParam)}`;
+      return requestJson(
+        `/api/conversations${cursor}`,
+        { method: "GET" },
+        (body) => conversationListResponseSchema.parse(body),
+        fallback,
+      );
+    },
+    initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 }

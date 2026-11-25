@@ -115,6 +115,12 @@ export const messages = {
     cancelError: "No pudimos cortar la respuesta.",
     cancelledNote: "Cortaste la respuesta.",
     sendError: "No pudimos enviar el mensaje. Probá de nuevo.",
+    conversationsTitle: "Tus conversaciones",
+    conversationsLabel: "Conversaciones",
+    conversationsError: "No pudimos cargar tus conversaciones",
+    untitled: "Sin título",
+    loadMore: "Ver más",
+    emptyConversations: "Todavía no tenés conversaciones.",
   },
   metadata: {
     title: "Middleware",

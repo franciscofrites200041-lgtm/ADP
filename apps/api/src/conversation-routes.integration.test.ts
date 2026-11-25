@@ -214,6 +214,36 @@ describe.skipIf(url === undefined)("conversation routes (postgres)", () => {
     expect(all.at(-1)?.content).toBe("mensaje 54");
   });
 
+  it("pages the conversation list with the cursor (§10)", async () => {
+    const seeded: string[] = [];
+    for (let index = 0; index < 55; index += 1) {
+      const rows = await harness.sql`
+        insert into conversation (id, workspace_id, agent_id)
+        values (gen_random_uuid(), ${ana.workspaceId}, ${agentId})
+        returning id`;
+      const row = rows[0];
+      if (row) seeded.push(String(row.id));
+    }
+
+    // Walk the cursor chain: every page unique, every page at most 50, and
+    // the whole seeded batch shows up exactly once (T10, §10).
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const path = `/api/conversations${cursor === null ? "" : `?cursor=${cursor}`}`;
+      const page = conversationListResponseSchema.parse(
+        await (await call(ana, "GET", path)).json(),
+      );
+      expect(page.conversations.length).toBeLessThanOrEqual(50);
+      seen.push(...page.conversations.map((conversation) => conversation.id));
+      cursor = page.nextCursor;
+      expect(seen.length).toBeLessThan(500);
+    } while (cursor !== null);
+
+    expect(new Set(seen).size).toBe(seen.length);
+    for (const id of seeded) expect(seen).toContain(id);
+  });
+
   it("rejects a malformed cursor and an invalid agent", async () => {
     const conversation = await createConversation(ana, agentId);
 

@@ -26,6 +26,7 @@ export type * from "./ports/usage-repo.ts";
 export * from "./security/forbidden-url-error.ts";
 export * from "./security/network-policy.ts";
 export * from "./usecases/agents.ts";
+export * from "./usecases/conversations.ts";
 export * from "./usecases/credentials.ts";
 export * from "./usecases/models.ts";
 export * from "./usecases/runs.ts";

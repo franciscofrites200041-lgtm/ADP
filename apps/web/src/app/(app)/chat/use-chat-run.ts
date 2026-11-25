@@ -1,6 +1,10 @@
 "use client";
 
-import type { MessageResponse, RunEvent } from "@middleware/contracts";
+import type {
+  ConversationResponse,
+  MessageResponse,
+  RunEvent,
+} from "@middleware/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -101,6 +105,9 @@ export function useChatRun({
           );
           // The run row and its user message already exist (S1).
           void queryClient.invalidateQueries({ queryKey: ["conversation"] });
+          void queryClient.invalidateQueries({
+            queryKey: ["chat-conversations"],
+          });
           break;
         }
         case "message.delta": {
@@ -261,6 +268,27 @@ export function useChatRun({
     void cancelRun(runId, cancelError).catch(() => undefined);
   }, [cancelError, live]);
 
+  /**
+   * Opens a past conversation from the history (T10): its agent takes over
+   * the screen, its messages load into the transcript, and any answer in
+   * flight is dropped — writes keep landing in the opened conversation.
+   */
+  const openConversation = useCallback(
+    (conversation: ConversationResponse): void => {
+      streamRef.current?.abort();
+      streamRef.current = null;
+      agentIdRef.current = conversation.agentId;
+      setConversationId(conversation.id);
+      conversationIdRef.current = conversation.id;
+      setPendingUser(null);
+      setLive(null);
+      setLiveMessages([]);
+      lastSeqRef.current = 0;
+      replaceUrl(conversation.agentId, conversation.id, null);
+    },
+    [],
+  );
+
   /** The agent changed: drop the conversation and any answer in flight. */
   const resetConversation = useCallback((agent: string | null): void => {
     agentIdRef.current = agent;
@@ -277,12 +305,14 @@ export function useChatRun({
     live?.phase === "connecting" || live?.phase === "streaming";
 
   return {
+    conversationId,
     history,
     isAnswering,
     live,
     liveMessages,
     messagesIsError: messages.isError,
     pendingUser,
+    openConversation,
     refetchMessages: useCallback(
       () => void messages.refetch(),
       [messages.refetch],
@@ -291,11 +321,13 @@ export function useChatRun({
     startRun,
     stop: cancel,
   } satisfies {
+    conversationId: string | null;
     history: MessageResponse[];
     isAnswering: boolean;
     live: LiveRun | null;
     liveMessages: LiveMessage[];
     messagesIsError: boolean;
+    openConversation: (conversation: ConversationResponse) => void;
     pendingUser: string | null;
     refetchMessages: () => void;
     resetConversation: (agent: string | null) => void;

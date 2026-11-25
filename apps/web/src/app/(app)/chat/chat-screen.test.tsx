@@ -108,10 +108,23 @@ type Handler = (
 
 type Routes = Record<string, Handler>;
 
+const listedConversations = () =>
+  new Response(
+    JSON.stringify({
+      conversations: [{ ...conversation, title: "Consulta de factura" }],
+      nextCursor: null,
+    }),
+    { status: 200 },
+  );
+
 function baseRoutes(): Routes {
   return {
     "GET /api/agents": () =>
       new Response(JSON.stringify({ agents: [agent] }), { status: 200 }),
+    "GET /api/conversations": () =>
+      new Response(JSON.stringify({ conversations: [], nextCursor: null }), {
+        status: 200,
+      }),
     "POST /api/conversations": () =>
       new Response(JSON.stringify(conversation), { status: 201 }),
     "GET /api/conversations/:id/messages": () =>
@@ -303,6 +316,63 @@ describe("ChatScreen", () => {
     });
     expect(screen.getByText("Hol")).toBeDefined();
     expect(screen.queryByText("Pensando…")).toBeNull();
+  });
+
+  it("lists the past conversations and opens one on selection", async () => {
+    const user = userEvent.setup();
+    const { calls } = renderScreen(
+      {},
+      { "GET /api/conversations": listedConversations },
+    );
+
+    const item = await screen.findByRole("button", {
+      name: /Consulta de factura/,
+    });
+    await user.click(item);
+
+    // Selecting loads that conversation's messages into the transcript (S11).
+    await screen.findByText("¿Cómo estás?");
+    expect(screen.getAllByText("Hola")).toHaveLength(1);
+    expect(
+      calls.some((call) => call.key === "GET /api/conversations/:id/messages"),
+    ).toBe(true);
+    // The address keeps the selection so a reload rehydrates it.
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get("agent")).toBe(AGENT_ID);
+      expect(params.get("conversation")).toBe(CONVERSATION_ID);
+    });
+  });
+
+  it("keeps writing into the conversation opened from the history", async () => {
+    const user = userEvent.setup();
+    const { calls } = renderScreen(
+      {},
+      { "GET /api/conversations": listedConversations },
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: /Consulta de factura/ }),
+    );
+    await screen.findByText("Hola");
+
+    await user.type(screen.getByLabelText("Mensaje"), "¿Y después?");
+    await user.click(screen.getByRole("button", { name: "Enviar" }));
+
+    await waitFor(() => {
+      const runCall = calls.find((call) => call.key === "POST /api/runs");
+      expect(runCall?.init?.body).toBeDefined();
+      const body = JSON.parse(String(runCall?.init?.body)) as {
+        agentId: string;
+        conversationId: string;
+      };
+      expect(body.agentId).toBe(AGENT_ID);
+      expect(body.conversationId).toBe(CONVERSATION_ID);
+    });
+    // The same conversation is reused: no second conversation is created.
+    expect(calls.some((call) => call.key === "POST /api/conversations")).toBe(
+      false,
+    );
   });
 
   it("asks the API to cancel the run while the answer is streaming", async () => {
