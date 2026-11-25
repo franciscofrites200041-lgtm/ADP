@@ -69,6 +69,29 @@ jobs:
       - name: Build the web app
         run: pnpm --filter @middleware/web build
 
+      # The browser is the only place three defects this session were visible:
+      # a component error boundary, a form that crashed at render, and a chat
+      # screen that lost the answer on reload. Nothing above catches those.
+      - name: Install the browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end and smoke in a real browser
+        # The master key is generated per run: a fixed one in the repository
+        # would be a committed secret, and this one only has to unwrap keys
+        # the same run's API creates.
+        run: |
+          export MW_MASTER_KEY="$(node -e \
+            'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
+          pnpm exec playwright test
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL_TEST }}
+          E2E_API_DATABASE_URL: ${{ env.DATABASE_URL_TEST }}
+          BETTER_AUTH_SECRET: ci-only-secret-not-used-in-production-0000
+          BETTER_AUTH_URL: http://localhost:3001
+          SMTP_URL: smtp://localhost:1025
+          MAIL_FROM: Middleware <no-reply@localhost>
+          MW_MASTER_KEY_VERSION: v1
+
       # The boundaries a diff cannot show: core cannot reach the adapters, the
       # web cannot reach the database. See docs/ci.md.
       - name: Architecture

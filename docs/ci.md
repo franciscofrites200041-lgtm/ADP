@@ -12,6 +12,24 @@ y migrada antes de la suite).
 | `pnpm arch` | dependency-cruiser: las reglas de §2 que no se ven en un diff. |
 | `pnpm knip` | Código y dependencias que nadie usa. |
 | `pnpm build` (web) | Que el front compile. |
+| `pnpm exec playwright test` | Un navegador real: abre todas las pantallas y corre los flujos. Es lo único que ve un error boundary, un componente que revienta al renderizar o una recarga que pierde el texto. |
+
+## Por qué hay un smoke de navegador
+
+Tres defectos llegaron a `main` con typecheck, lint y todos los tests en verde: una
+pantalla que caía en su error boundary por un error de React, un formulario que le
+pasaba `children` a un `input`, y una pantalla de chat que perdía la respuesta al
+recargar porque el `run.started` no dejaba el agente en la dirección. Ninguno era
+visible sin abrir la página.
+
+`tests/e2e/smoke.spec.ts` abre cada ruta del shell y falla si aparece el texto del
+error boundary, si falta el título de la pantalla o si la consola registra un
+error. La aserción está viva: con una espera equivocada falla, que es la prueba
+de que no es decorativa.
+
+Nota de esta máquina: `next dev` no hidrata y `next start` sirve un build
+congelado. Un cambio de UI exige reconstruir antes de correr el e2e, o el
+navegador sigue viendo el build anterior y el test pasa sin haber visto nada.
 
 ## Las reglas de arquitectura
 

@@ -12,9 +12,21 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3000",
   },
-  webServer: {
-    command: "pnpm --filter @middleware/web dev",
-    port: 3000,
-    reuseExistingServer: !environment.CI,
-  },
+  // The browser suite needs both processes. It used to start only the web app
+  // with `next dev`, which never ran the API and — on this machine at least —
+  // does not hydrate, so the suite could not have passed anywhere.
+  webServer: [
+    {
+      command: "pnpm --filter @middleware/api dev",
+      port: 3001,
+      reuseExistingServer: !environment.CI,
+      timeout: 120_000,
+    },
+    {
+      command: "pnpm --filter @middleware/web exec next start -p 3000",
+      port: 3000,
+      reuseExistingServer: !environment.CI,
+      timeout: 120_000,
+    },
+  ],
 });
