@@ -8,16 +8,12 @@ import { createAuditLogRepo } from "./audit-log-repo.ts";
 import { createCredentialRepo } from "./credential-repo.ts";
 import { createCredentialSecretVault } from "./credential-secret-vault.ts";
 import { CryptoError, createKeyring } from "./envelope.ts";
+import { testDatabaseUrl } from "./testing/test-database-url.ts";
 import { createWorkspaceKeyVault } from "./workspace-key-vault.ts";
 
-// Opt-in: only runs with DATABASE_URL_TEST, and only against the disposable DB.
-const url = process.env.DATABASE_URL_TEST;
-if (url) {
-  const u = new URL(url);
-  if (u.hostname !== "127.0.0.1" || u.pathname !== "/middleware_test") {
-    throw new Error("Refusing to run against a non-disposable database");
-  }
-}
+// Opt-in: only runs with DATABASE_URL_TEST, and only against the disposable
+// DB, validated in one shared place (ADR-0006).
+const url = testDatabaseUrl();
 
 describe.skipIf(!url)("credential secret vault (postgres)", () => {
   const sql = postgres(url ?? "", { max: 5 });

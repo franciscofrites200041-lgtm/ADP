@@ -1,23 +1,14 @@
 import { Agent, type StreamFn } from "@earendil-works/pi-agent-core";
 import {
-  type Api,
-  type ApiKeyCredential,
   type AssistantMessage,
-  type AuthContext,
-  type CredentialStore,
   calculateCost,
   createModels,
-  createProvider,
   type Message,
-  type Model,
   type Provider as PiProvider,
-  type ProviderAuth,
   type TextContent,
   type Usage,
 } from "@earendil-works/pi-ai";
-import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
-import type { ProviderErrorCode } from "@middleware/contracts";
 import type {
   AgentRuntime,
   AgentRuntimeEvent,
@@ -25,158 +16,18 @@ import type {
   RuntimeMessage,
   UrlGuard,
 } from "@middleware/core";
+import { ForbiddenUrlError, ProviderError } from "@middleware/core";
+import { InvariantError } from "./errors.ts";
+
 import {
-  DomainError,
-  ForbiddenUrlError,
-  ProviderError,
-} from "@middleware/core";
-
-/**
- * Our provider ids → pi-ai provider ids, mirroring the model gateway: the
- * compiler forces a line here for every new id (a new contract id stops this
- * file typechecking until the map has it).
- *
- * "openai-compatible" resolves to a provider synthesized from the credential's
- * `baseUrl`, built only after the injected `UrlGuard` approves the URL and
- * contacted only through the injected safe fetch (§8). Both pieces are the
- * same guard and client the container built for the gateway.
- */
-const PI_PROVIDER_IDS = {
-  openai: "openai",
-  anthropic: "anthropic",
-  google: "google",
-  xai: "xai",
-  openrouter: "openrouter",
-  "openai-compatible": "openai-compatible",
-} as const;
-
-type PiChatModel = Model<Api>;
-
-/**
- * pi-ai's default auth context reads `process.env` and the filesystem for
- * ambient credentials, which S3 forbids. Every `Models` built here gets this
- * closed context, so auth can only come from the credential of the turn.
- */
-const CLOSED_AUTH_CONTEXT: AuthContext = {
-  env: async () => undefined,
-  fileExists: async () => false,
-};
-
-/** Catalog defaults for compatible endpoints, which advertise no limits. */
-const COMPAT_CONTEXT_WINDOW = 128_000;
-const COMPAT_MAX_TOKENS = 16_384;
-
-/**
- * Auth for the synthesized compatible provider: it resolves only from the
- * per-turn credential store, never from the environment (S3).
- */
-const COMPAT_AUTH: ProviderAuth = {
-  apiKey: {
-    name: "Compatible API key",
-    resolve: async ({ credential, signal }) => {
-      signal.throwIfAborted();
-      const key = credential?.key;
-      if (key === undefined || key === "") return undefined;
-      return { auth: { apiKey: key }, source: "stored credential" };
-    },
-  },
-};
-
-/**
- * The per-turn store is an in-call read-only view (S3); a write to it is a
- * programming error, never a user-facing outcome.
- */
-class ReadOnlyCredentialStoreError extends DomainError {
-  constructor() {
-    super("unknown", "The per-turn credential store is read-only");
-  }
-}
-
-/** A store that holds exactly one credential, alive only for one turn (S3). */
-function singleCredentialStore(
-  piProviderId: string,
-  apiKey: string,
-): CredentialStore {
-  const stored: ApiKeyCredential = { type: "api_key", key: apiKey };
-  return {
-    async read(providerId) {
-      return providerId === piProviderId ? stored : undefined;
-    },
-    async list() {
-      return [{ providerId: piProviderId, type: "api_key" }];
-    },
-    async modify() {
-      throw new ReadOnlyCredentialStoreError();
-    },
-    async delete() {
-      throw new ReadOnlyCredentialStoreError();
-    },
-  };
-}
-
-/** The synthesized chat model: one per requested id, bound to the base URL. */
-function synthesizeCompatibleModel(
-  modelId: string,
-  baseUrl: string,
-): PiChatModel {
-  return {
-    id: modelId,
-    name: modelId,
-    api: "openai-completions",
-    provider: "openai-compatible",
-    baseUrl,
-    input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    reasoning: false,
-    contextWindow: COMPAT_CONTEXT_WINDOW,
-    maxTokens: COMPAT_MAX_TOKENS,
-  };
-}
-
-/**
- * The §10 codes the runtime produces; the rest of the catalog belongs to the
- * run engine. Mirrors the gateway's table: first match wins, so a message is
- * checked from most to least specific (a 429 that says "quota" must beat the
- * generic rate-limit line).
- */
-const FAILURE_PATTERNS: ReadonlyArray<readonly [RegExp, ProviderErrorCode]> = [
-  [
-    /context (length|window)|maximum context|context_length|too long|too many tokens|prompt is too long/i,
-    "context_too_long",
-  ],
-  [
-    /content[-_ ]?filter|content (management )?policy|safety|flagged/i,
-    "content_filtered",
-  ],
-  [
-    /\bquota\b|insufficient|billing|payment required|credit balance|\b402\b/i,
-    "insufficient_quota",
-  ],
-  [/rate.?limit|too many requests|\b429\b/i, "rate_limited"],
-  [
-    /api.?key|apikey|unauthorized|authentication|\b401\b|not configured|permission/i,
-    "invalid_api_key",
-  ],
-  [
-    /model.*(does not exist|not (found|available))|no such model|unknown model|\b404\b/i,
-    "model_not_found",
-  ],
-  [/timeout|timed out|\b408\b|deadline exceeded/i, "provider_timeout"],
-  [
-    /unavailable|overload|\b50[03]\b|\b529\b|internal server error|server error/i,
-    "provider_unavailable",
-  ],
-];
-
-/** Classifies a pi-agent-core failure text into the §10 catalog (§10). */
-function mapProviderErrorCode(failure: string): ProviderErrorCode {
-  for (const [pattern, code] of FAILURE_PATTERNS) {
-    if (pattern.test(failure)) {
-      return code;
-    }
-  }
-  return "unknown";
-}
+  CLOSED_AUTH_CONTEXT,
+  createCompatibleProvider,
+  mapProviderErrorCode,
+  PI_PROVIDER_IDS,
+  type PiChatModel,
+  singleCredentialStore,
+  synthesizeCompatibleModel,
+} from "./pi-provider-machinery.ts";
 
 /**
  * Usage recorded for replayed assistant history: never sent as new tokens,
@@ -293,11 +144,16 @@ async function prepareTurn(
   deps: RuntimeDeps,
 ): Promise<PreparedTurn> {
   if (input.messages.length === 0) {
-    throw new TypeError("A turn needs at least one message");
+    throw new InvariantError(
+      "turn_needs_message",
+      "A turn needs at least one message",
+    );
   }
   const last = input.messages.at(-1);
   if (last === undefined || last.role === "assistant") {
-    throw new TypeError(
+    // A caller bug in the engine's loop, never a user outcome (§10).
+    throw new InvariantError(
+      "turn_prompt_invalid",
       "The last message of a turn must be a user or tool_result message",
     );
   }
@@ -316,16 +172,9 @@ async function prepareTurn(
       provider = undefined;
     } else {
       await deps.urlGuard.assertAllowed(baseUrl);
-      // One provider per base URL: its catalog is empty (models are
-      // synthesized per request), so it is immutable and safe to cache.
-      provider = createProvider({
-        id: "openai-compatible",
-        name: "Compatible with OpenAI",
-        baseUrl,
-        auth: COMPAT_AUTH,
-        models: [],
-        api: openAICompletionsApi(),
-      });
+      // One provider per turn: built fresh, its catalog is empty (models are
+      // synthesized per request) and it holds no mutable state.
+      provider = createCompatibleProvider(baseUrl);
       model = synthesizeCompatibleModel(input.model.modelId, baseUrl);
     }
   } else {

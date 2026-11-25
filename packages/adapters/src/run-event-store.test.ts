@@ -9,14 +9,11 @@ import { afterAll, describe, expect, it } from "vitest";
 import { createRunEventStore } from "./run-event-store.ts";
 import { createRunRepo } from "./run-repo.ts";
 
-// Opt-in: only runs with DATABASE_URL_TEST, and only against the disposable DB.
-const url = process.env.DATABASE_URL_TEST;
-if (url) {
-  const u = new URL(url);
-  if (u.hostname !== "127.0.0.1" || u.pathname !== "/middleware_test") {
-    throw new Error("Refusing to run against a non-disposable database");
-  }
-}
+import { testDatabaseUrl } from "./testing/test-database-url.ts";
+
+// Opt-in: only runs with DATABASE_URL_TEST, and only against the disposable
+// DB, validated in one shared place (ADR-0006).
+const url = testDatabaseUrl();
 
 describe.skipIf(!url)("run event store (postgres)", () => {
   const sql = postgres(url ?? "", { max: 5 });

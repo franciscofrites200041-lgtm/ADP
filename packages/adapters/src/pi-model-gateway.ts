@@ -1,20 +1,12 @@
 import {
-  type Api,
-  type ApiKeyCredential,
   type AssistantMessage,
-  type AuthContext,
-  type CredentialStore,
   calculateCost,
   createModels,
-  createProvider,
-  type Model,
   type MutableModels,
   type Provider as PiProvider,
-  type ProviderAuth,
 } from "@earendil-works/pi-ai";
-import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
-import type { ModelDescriptor } from "@middleware/contracts";
+import type { ModelDescriptor, ProviderErrorCode } from "@middleware/contracts";
 import type {
   ModelCredential,
   ModelGateway,
@@ -22,107 +14,28 @@ import type {
   ProviderStreamEvent,
   UrlGuard,
 } from "@middleware/core";
-import { DomainError, ProviderError } from "@middleware/core";
+import { ProviderError } from "@middleware/core";
 import { z } from "zod";
 
-/**
- * Our provider ids → pi-ai provider ids, in one object: adding a provider is
- * one line, and the compiler forces the line (a new id in the contract makes
- * every lookup stop typechecking until the registry has it).
- *
- * "openai-compatible" resolves to a provider synthesized from the credential's
- * `baseUrl`, built only after the injected `UrlGuard` approves the URL and
- * contacted only through the injected safe fetch (§8).
- */
-const PI_PROVIDER_IDS = {
-  openai: "openai",
-  anthropic: "anthropic",
-  google: "google",
-  xai: "xai",
-  openrouter: "openrouter",
-  "openai-compatible": "openai-compatible",
-} as const;
-
-type OurProviderId = keyof typeof PI_PROVIDER_IDS;
-
-type PiChatModel = Model<Api>;
-
-/**
- * pi-ai's default auth context reads `process.env` and the filesystem for
- * ambient credentials, which S3 forbids. Every `Models` built here gets this
- * closed context, so auth can only come from the credential of the call.
- */
-const CLOSED_AUTH_CONTEXT: AuthContext = {
-  env: async () => undefined,
-  fileExists: async () => false,
-};
-
-/**
- * The §10 codes this gateway produces; the rest of the catalog belongs to the
- * run engine (WP-30).
- */
-type MappedProviderErrorCode =
-  | "invalid_api_key"
-  | "insufficient_quota"
-  | "rate_limited"
-  | "model_not_found"
-  | "context_too_long"
-  | "provider_timeout"
-  | "provider_unavailable"
-  | "content_filtered"
-  | "unknown";
-
-/**
- * First match wins, so a message is checked from most to least specific (a
- * 429 that says "quota" must beat the generic rate-limit line).
- */
-const FAILURE_PATTERNS: ReadonlyArray<
-  readonly [RegExp, MappedProviderErrorCode]
-> = [
-  [
-    /context (length|window)|maximum context|context_length|too long|too many tokens|prompt is too long/i,
-    "context_too_long",
-  ],
-  [
-    /content[-_ ]?filter|content (management )?policy|safety|flagged/i,
-    "content_filtered",
-  ],
-  [
-    /\bquota\b|insufficient|billing|payment required|credit balance|\b402\b/i,
-    "insufficient_quota",
-  ],
-  [/rate.?limit|too many requests|\b429\b/i, "rate_limited"],
-  [
-    /api.?key|apikey|unauthorized|authentication|\b401\b|not configured|permission/i,
-    "invalid_api_key",
-  ],
-  [
-    /model.*(does not exist|not (found|available))|no such model|unknown model|\b404\b/i,
-    "model_not_found",
-  ],
-  [/timeout|timed out|\b408\b|deadline exceeded/i, "provider_timeout"],
-  [
-    /unavailable|overload|\b50[03]\b|\b529\b|internal server error|server error/i,
-    "provider_unavailable",
-  ],
-];
-
-/** Classifies a pi-ai failure text into the §10 catalog (§10). */
-function mapProviderErrorCode(failure: string): MappedProviderErrorCode {
-  for (const [pattern, code] of FAILURE_PATTERNS) {
-    if (pattern.test(failure)) {
-      return code;
-    }
-  }
-  return "unknown";
-}
+import {
+  CLOSED_AUTH_CONTEXT,
+  COMPAT_CONTEXT_WINDOW,
+  COMPAT_MAX_TOKENS,
+  createCompatibleProvider,
+  mapProviderErrorCode,
+  type OurProviderId,
+  PI_PROVIDER_IDS,
+  type PiChatModel,
+  singleCredentialStore,
+  synthesizeCompatibleModel,
+} from "./pi-provider-machinery.ts";
 
 /**
  * Only the code crosses this boundary; the Spanish text lives in the messages
  * file of the layer that renders it, and never the provider's own message, so
  * no secret can leak through an error detail (S2, WP-33).
  */
-function providerError(code: MappedProviderErrorCode): ProviderError {
+function providerError(code: ProviderErrorCode): ProviderError {
   return new ProviderError(code);
 }
 
@@ -130,84 +43,6 @@ function providerErrorFromFailure(failure: AssistantMessage): ProviderError {
   const message =
     failure.errorMessage ?? "The provider request failed without a message";
   return providerError(mapProviderErrorCode(message));
-}
-
-/** Catalog defaults for compatible endpoints, which advertise no limits. */
-const COMPAT_CONTEXT_WINDOW = 128_000;
-const COMPAT_MAX_TOKENS = 16_384;
-
-/**
- * Auth for the synthesized compatible provider: it resolves only from the
- * per-execution credential store, never from the environment (S3).
- */
-const COMPAT_AUTH: ProviderAuth = {
-  apiKey: {
-    name: "Compatible API key",
-    resolve: async ({ credential, signal }) => {
-      signal.throwIfAborted();
-      const key = credential?.key;
-      if (key === undefined || key === "") return undefined;
-      return { auth: { apiKey: key }, source: "stored credential" };
-    },
-  },
-};
-
-/** The synthesized chat model: one per requested id, bound to the base URL. */
-function synthesizeCompatibleModel(
-  modelId: string,
-  baseUrl: string,
-): PiChatModel {
-  return {
-    id: modelId,
-    name: modelId,
-    api: "openai-completions",
-    provider: "openai-compatible",
-    baseUrl,
-    input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    reasoning: false,
-    contextWindow: COMPAT_CONTEXT_WINDOW,
-    maxTokens: COMPAT_MAX_TOKENS,
-  };
-}
-
-/**
- * The per-execution store is an in-call read-only view (S3); a write to it is
- * a programming error, never a user-facing outcome (§10: `unknown`).
- */
-class ReadOnlyCredentialStoreError extends DomainError {
-  constructor() {
-    super("unknown", "The per-execution credential store is read-only");
-  }
-}
-
-/**
- * A credential store that holds exactly one credential, alive only for one
- * gateway call: one `Models` per execution, never shared (S3). Read-only,
- * because the gateway never logs in, refreshes OAuth or deletes credentials.
- */
-function singleCredentialStore(
-  piProviderId: string,
-  credential: ModelCredential,
-): CredentialStore {
-  const stored: ApiKeyCredential = {
-    type: "api_key",
-    key: credential.apiKey,
-  };
-  return {
-    async read(providerId) {
-      return providerId === piProviderId ? stored : undefined;
-    },
-    async list() {
-      return [{ providerId: piProviderId, type: "api_key" }];
-    },
-    async modify() {
-      throw new ReadOnlyCredentialStoreError();
-    },
-    async delete() {
-      throw new ReadOnlyCredentialStoreError();
-    },
-  };
 }
 
 // The returned shape is checked against the port's ModelDescriptor at every
@@ -268,14 +103,7 @@ export function createPiModelGateway(
   const compatibleProviderFor = (baseUrl: string): PiProvider => {
     const cached = compatibleProviders.get(baseUrl);
     if (cached !== undefined) return cached;
-    const provider = createProvider({
-      id: "openai-compatible",
-      name: "Compatible with OpenAI",
-      baseUrl,
-      auth: COMPAT_AUTH,
-      models: [],
-      api: openAICompletionsApi(),
-    });
+    const provider = createCompatibleProvider(baseUrl);
     compatibleProviders.set(baseUrl, provider);
     return provider;
   };
@@ -350,7 +178,7 @@ export function createPiModelGateway(
       credential === undefined
         ? { authContext: CLOSED_AUTH_CONTEXT }
         : {
-            credentials: singleCredentialStore(provider.id, credential),
+            credentials: singleCredentialStore(provider.id, credential.apiKey),
             authContext: CLOSED_AUTH_CONTEXT,
           },
     );

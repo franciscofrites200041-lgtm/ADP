@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { ContainerConfigError, createContainer } from "./container.ts";
 import { CryptoError } from "./envelope.ts";
 import { ProviderKeyEnvError } from "./provider-env.ts";
+import { testDatabaseUrl } from "./testing/test-database-url.ts";
 
 // Port 1 refuses connections: validation must fail before any connection.
 const validEnv = {
@@ -124,14 +125,9 @@ describe("createContainer configuration", () => {
   });
 });
 
-// Opt-in like the other database tests: disposable database only.
-const databaseUrl = process.env.DATABASE_URL_TEST;
-if (databaseUrl) {
-  const { hostname, pathname } = new URL(databaseUrl);
-  if (hostname !== "127.0.0.1" || pathname !== "/middleware_test") {
-    throw new Error("Refusing to run against a non-disposable database");
-  }
-}
+// Opt-in like the other database tests: validated in one shared place
+// (ADR-0006).
+const databaseUrl = testDatabaseUrl();
 
 describe.skipIf(!databaseUrl)("createContainer with PostgreSQL", () => {
   it("wires a working workspace key vault and closes idempotently", async () => {

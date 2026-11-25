@@ -6,6 +6,7 @@ import type {
   MessageRepo,
   RunEventStore,
   RunRepo,
+  RunSweeper,
   UrlGuard,
   UsageRepo,
 } from "@middleware/core";
@@ -23,7 +24,7 @@ import { createInMemoryLiveEventBus } from "./live-event-bus.ts";
 import { createMessageRepo } from "./message-repo.ts";
 import { assertNoProviderKeys } from "./provider-env.ts";
 import { createRunEventStore } from "./run-event-store.ts";
-import { createRunRepo } from "./run-repo.ts";
+import { createRunRepo, createRunSweeper } from "./run-repo.ts";
 import { createSafeFetch } from "./safe-fetch.ts";
 import { createUrlGuard } from "./url-guard.ts";
 import { createUsageRepo } from "./usage-repo.ts";
@@ -56,6 +57,11 @@ export type Container = {
   /** Run repos over the same pool as `sql`; one pool, one `close` (§5). */
   readonly runRepo: RunRepo;
   readonly runEventStore: RunEventStore;
+  /**
+   * The system-level sweep of expired leases (ADR-0007), over the same pool;
+   * the worker's tick is its only caller.
+   */
+  readonly runSweeper: RunSweeper;
   /** Conversation storage of the chat MVP (S7, S11); same pool. */
   readonly conversationRepo: ConversationRepo;
   readonly messageRepo: MessageRepo;
@@ -117,6 +123,7 @@ export async function createContainer(
   const container = {
     runRepo: createRunRepo(db),
     runEventStore: createRunEventStore(db),
+    runSweeper: createRunSweeper(db),
     conversationRepo: createConversationRepo(db),
     messageRepo: createMessageRepo(db),
     usageRepo: createUsageRepo(db),

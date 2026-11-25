@@ -1,20 +1,19 @@
 import { randomUUID } from "node:crypto";
+import type { RunCheckpoint } from "@middleware/contracts";
 import type { RunDraft } from "@middleware/core";
 import { createId, schema } from "@middleware/db";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { createRunRepo } from "./run-repo.ts";
+import { InvariantError } from "./errors.ts";
+import { createRunRepo, createRunSweeper } from "./run-repo.ts";
 
-// Opt-in: only runs with DATABASE_URL_TEST, and only against the disposable DB.
-const url = process.env.DATABASE_URL_TEST;
-if (url) {
-  const u = new URL(url);
-  if (u.hostname !== "127.0.0.1" || u.pathname !== "/middleware_test") {
-    throw new Error("Refusing to run against a non-disposable database");
-  }
-}
+import { testDatabaseUrl } from "./testing/test-database-url.ts";
+
+// Opt-in: only runs with DATABASE_URL_TEST, and only against the disposable
+// DB, validated in one shared place (ADR-0006).
+const url = testDatabaseUrl();
 
 describe.skipIf(!url)("run repo (postgres)", () => {
   const sql = postgres(url ?? "", { max: 5 });
@@ -128,7 +127,13 @@ describe.skipIf(!url)("run repo (postgres)", () => {
   it("round-trips checkpoint and turns through saveProgress", async () => {
     const ws = workspace();
     const run = await repo.insert(ws, await draft(ws));
-    const checkpoint = { turn: 2, history: ["a", "b"] };
+    // The contract shape: the transcript a resume streams from (WP-50).
+    const checkpoint: RunCheckpoint = {
+      transcript: [
+        { role: "user", text: "hola" },
+        { role: "assistant", text: "listo" },
+      ],
+    };
     const saved = await repo.saveProgress(ws, run.id, {
       checkpoint,
       turnsCompleted: 2,
@@ -136,6 +141,19 @@ describe.skipIf(!url)("run repo (postgres)", () => {
     expect(saved?.checkpoint).toEqual(checkpoint);
     expect(saved?.turnsCompleted).toBe(2);
     expect((await repo.findById(ws, run.id))?.checkpoint).toEqual(checkpoint);
+  });
+
+  it("rejects a checkpoint that does not honour the contract", async () => {
+    const ws = workspace();
+    const run = await repo.insert(ws, await draft(ws));
+    // Every method reads back through the boundary, so a row that does not
+    // parse fails loudly at the call, never as a silent `undefined`.
+    await expect(
+      repo.saveProgress(ws, run.id, {
+        checkpoint: { turn: 2, history: ["a"] },
+        turnsCompleted: 2,
+      }),
+    ).rejects.toThrow(InvariantError);
   });
 
   it("finish stamps the terminal state and drops the lease", async () => {
@@ -163,7 +181,8 @@ describe.skipIf(!url)("run repo (postgres)", () => {
     expect(done?.errorCode).toBeNull();
   });
 
-  it("listExpiredLeases returns only expired running runs", async () => {
+  it("sweep listExpiredLeases returns only expired running runs, as id pairs", async () => {
+    const sweeper = createRunSweeper(drizzle(sql, { schema }));
     const ws = workspace();
     const expired = await repo.insert(ws, await draft(ws));
     await repo.claimLease(ws, expired.id, new Date(Date.now() - 1000));
@@ -174,11 +193,108 @@ describe.skipIf(!url)("run repo (postgres)", () => {
     await repo.finish(ws, finished.id, { status: "succeeded", output: "ok" });
     const queued = await repo.insert(ws, await draft(ws));
 
-    const stale = await repo.listExpiredLeases(new Date());
-    expect(stale.map((run) => run.id)).toEqual([expired.id]);
-    expect(stale[0]?.workspaceId).toBe(ws);
-    void live;
-    void queued;
+    const stale = await sweeper.listExpiredLeases(new Date());
+    // Only this file's rows: the sweep is system-wide, and other suites run
+    // against the same database.
+    const ownIds = stale
+      .filter((pair) => pair.workspaceId === ws)
+      .map((pair) => pair.runId);
+    expect(ownIds).toEqual([expired.id]);
+    // A live lease and every non-running run are invisible to the sweep.
+    expect(ownIds).not.toContain(live.id);
+    expect(ownIds).not.toContain(finished.id);
+    expect(ownIds).not.toContain(queued.id);
+  });
+
+  describe("cross-tenant writes are refused (S4)", () => {
+    /** A claimed run in `ws`, with a foreign workspace ready to attack. */
+    const seedRunning = async () => {
+      const ws = workspace();
+      const foreign = workspace();
+      const run = await repo.insert(ws, await draft(ws));
+      const leaseUntil = new Date(Date.now() + 60_000);
+      await repo.claimLease(ws, run.id, leaseUntil);
+      return { ws, foreign, run, leaseUntil };
+    };
+
+    it("claimLease: returns false and the lease stays as it was", async () => {
+      const { ws, foreign, run, leaseUntil } = await seedRunning();
+
+      const claimed = await repo.claimLease(
+        foreign,
+        run.id,
+        new Date(Date.now() + 120_000),
+      );
+      expect(claimed).toBe(false);
+
+      const row = await repo.findById(ws, run.id);
+      expect(row?.status).toBe("running");
+      expect(row?.leaseUntil?.getTime()).toBe(leaseUntil.getTime());
+    });
+
+    it("renewLease: no effect on the row", async () => {
+      const { ws, foreign, run, leaseUntil } = await seedRunning();
+
+      const renewed = await repo.renewLease(
+        foreign,
+        run.id,
+        new Date(Date.now() + 120_000),
+      );
+      expect(renewed).toBeNull();
+
+      const row = await repo.findById(ws, run.id);
+      expect(row?.leaseUntil?.getTime()).toBe(leaseUntil.getTime());
+    });
+
+    it("saveProgress: checkpoint and turnsCompleted unchanged", async () => {
+      const { ws, foreign, run } = await seedRunning();
+      await repo.saveProgress(ws, run.id, {
+        checkpoint: { transcript: [{ role: "user", text: "hola" }] },
+        turnsCompleted: 3,
+      });
+
+      const progress: RunCheckpoint = {
+        transcript: [{ role: "user", text: "inyección" }],
+      };
+      const saved = await repo.saveProgress(foreign, run.id, {
+        checkpoint: progress,
+        turnsCompleted: 99,
+      });
+      expect(saved).toBeNull();
+
+      const row = await repo.findById(ws, run.id);
+      expect(row?.turnsCompleted).toBe(3);
+      expect(row?.checkpoint).toEqual({
+        transcript: [{ role: "user", text: "hola" }],
+      });
+    });
+
+    it("finish: status and finishedAt unchanged", async () => {
+      const { ws, foreign, run, leaseUntil } = await seedRunning();
+
+      const finished = await repo.finish(foreign, run.id, {
+        status: "cancelled",
+        output: null,
+      });
+      expect(finished).toBeNull();
+
+      const row = await repo.findById(ws, run.id);
+      expect(row?.status).toBe("running");
+      expect(row?.finishedAt).toBeNull();
+      expect(row?.output).toBeNull();
+      expect(row?.leaseUntil?.getTime()).toBe(leaseUntil.getTime());
+    });
+
+    it("listByWorkspace: returns nothing for a foreign workspace", async () => {
+      const { ws, foreign, run } = await seedRunning();
+
+      const listed = await repo.listByWorkspace(foreign, {});
+      expect(listed).toEqual([]);
+      // And the owner still sees its own row.
+      expect((await repo.listByWorkspace(ws, {})).map((row) => row.id)).toEqual(
+        [run.id],
+      );
+    });
   });
 
   it("listByWorkspace filters by status and scopes by workspace", async () => {

@@ -1,4 +1,4 @@
-import { runStatusSchema } from "@middleware/contracts";
+import { runCheckpointSchema, runStatusSchema } from "@middleware/contracts";
 import type {
   Run,
   RunDraft,
@@ -6,9 +6,14 @@ import type {
   RunOutcome,
   RunProgress,
   RunRepo,
+  RunSweeper,
+  SweptRun,
 } from "@middleware/core";
 import { type DbClient, schema } from "@middleware/db";
 import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { z } from "zod";
+
+import { InvariantError } from "./errors.ts";
 
 const runTable = schema.run;
 
@@ -20,36 +25,51 @@ const resumable = inArray(runTable.status, [
 ]);
 
 /**
- * `input` and `output` are jsonb at the driver but strings in the domain:
- * validated here, at the boundary, instead of cast to a type we hope the
- * row honours (same rule as the agent repo's jsonb columns).
+ * `input`, `output` and `checkpoint` are jsonb at the driver but typed in the
+ * domain: validated here, at the boundary, instead of cast to a type we hope
+ * the row honours (same rule as the agent repo's jsonb columns). The
+ * checkpoint shape lives once in `@middleware/contracts`: it is what the
+ * engine writes and what a resume (WP-50) reads.
  */
-const asText = (value: unknown, field: string): string => {
-  if (typeof value !== "string") throw new Error(`run ${field} is not text`);
-  return value;
-};
-
-const asNullableText = (value: unknown, field: string): string | null =>
-  value === null ? null : asText(value, field);
-
-const toRun = (row: typeof runTable.$inferSelect): Run => ({
-  id: row.id,
-  workspaceId: row.workspaceId,
-  agentId: row.agentId,
-  agentVersionId: row.agentVersionId,
-  conversationId: row.conversationId,
-  status: runStatusSchema.parse(row.status),
-  input: asText(row.input, "input"),
-  output: asNullableText(row.output, "output"),
-  errorCode: row.errorCode,
-  errorMessage: row.errorMessage,
-  turnsCompleted: row.turnsCompleted,
-  checkpoint: row.checkpoint,
-  leaseUntil: row.leaseUntil,
-  queuedAt: row.queuedAt,
-  startedAt: row.startedAt,
-  finishedAt: row.finishedAt,
+const runPayloadSchema = z.strictObject({
+  input: z.string(),
+  output: z.string().nullable(),
+  checkpoint: runCheckpointSchema.nullable(),
 });
+
+const toRun = (row: typeof runTable.$inferSelect): Run => {
+  const payload = runPayloadSchema.safeParse({
+    input: row.input,
+    output: row.output,
+    checkpoint: row.checkpoint,
+  });
+  if (!payload.success) {
+    // A malformed row is a broken invariant, never a silent `undefined`;
+    // the message names the offending columns, not their content.
+    throw new InvariantError(
+      "run_row_malformed",
+      `run row ${row.id} does not honour the contract (fields: ${payload.error.issues
+        .map((issue) => String(issue.path[0]))
+        .join(", ")})`,
+    );
+  }
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    agentId: row.agentId,
+    agentVersionId: row.agentVersionId,
+    conversationId: row.conversationId,
+    status: runStatusSchema.parse(row.status),
+    ...payload.data,
+    errorCode: row.errorCode,
+    errorMessage: row.errorMessage,
+    turnsCompleted: row.turnsCompleted,
+    leaseUntil: row.leaseUntil,
+    queuedAt: row.queuedAt,
+    startedAt: row.startedAt,
+    finishedAt: row.finishedAt,
+  };
+};
 
 /** Postgres adapter of `RunRepo` over the `run` table. */
 export function createRunRepo(db: DbClient): RunRepo {
@@ -71,7 +91,14 @@ export function createRunRepo(db: DbClient): RunRepo {
           status: "queued",
         })
         .returning();
-      if (!row) throw new Error("run insert returned no row");
+      // Safe: an INSERT … RETURNING without ON CONFLICT yields exactly one
+      // row; anything else is a broken invariant, not a user outcome.
+      if (!row) {
+        throw new InvariantError(
+          "run_insert_no_row",
+          "run insert returned no row",
+        );
+      }
       return toRun(row);
     },
 
@@ -174,17 +201,29 @@ export function createRunRepo(db: DbClient): RunRepo {
         .limit(filter.limit ?? 100);
       return rows.map(toRun);
     },
+  };
+}
 
-    // No workspace filter on purpose: a system sweep, see the port doc.
-    async listExpiredLeases(now) {
+/**
+ * Postgres adapter of the `RunSweeper` port (ADR-0007), over the same pool as
+ * `createRunRepo`. The sweep is a system job with no session, so it selects
+ * only the identifier columns: the query itself is what keeps run content out
+ * of the result.
+ */
+export function createRunSweeper(db: DbClient): RunSweeper {
+  return {
+    async listExpiredLeases(now): Promise<SweptRun[]> {
       const rows = await db
-        .select()
+        .select({ workspaceId: runTable.workspaceId, id: runTable.id })
         .from(runTable)
         .where(
           and(eq(runTable.status, "running"), lt(runTable.leaseUntil, now)),
         )
         .orderBy(runTable.leaseUntil);
-      return rows.map(toRun);
+      return rows.map((row) => ({
+        workspaceId: row.workspaceId,
+        runId: row.id,
+      }));
     },
   };
 }

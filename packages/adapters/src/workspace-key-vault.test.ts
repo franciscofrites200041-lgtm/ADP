@@ -3,16 +3,12 @@ import postgres from "postgres";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { CryptoError, createKeyring, wrapDek } from "./envelope.ts";
+import { testDatabaseUrl } from "./testing/test-database-url.ts";
 import { createWorkspaceKeyVault } from "./workspace-key-vault.ts";
 
-// Opt-in: only runs with DATABASE_URL_TEST, and only against the disposable DB.
-const url = process.env.DATABASE_URL_TEST;
-if (url) {
-  const u = new URL(url);
-  if (u.hostname !== "127.0.0.1" || u.pathname !== "/middleware_test") {
-    throw new Error("Refusing to run against a non-disposable database");
-  }
-}
+// Opt-in: only runs with DATABASE_URL_TEST, and only against the disposable
+// DB, validated in one shared place (ADR-0006).
+const url = testDatabaseUrl();
 
 describe.skipIf(!url)("workspace key vault (postgres)", () => {
   const sql = postgres(url ?? "", { max: 10 });

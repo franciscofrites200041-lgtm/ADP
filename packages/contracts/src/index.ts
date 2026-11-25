@@ -1,4 +1,5 @@
 export * from "./agents.ts";
+export * from "./checkpoint.ts";
 export * from "./conversations.ts";
 export * from "./credentials.ts";
 export * from "./errors.ts";

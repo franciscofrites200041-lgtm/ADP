@@ -9,7 +9,8 @@ import type {
 /**
  * Every method scopes by `workspaceId` first (S4): the id always comes from
  * the session, never from the request, so another workspace's run reads as
- * missing. The one exception is `listExpiredLeases`, documented there.
+ * missing. There is no workspace-less exception here: the system-wide sweep
+ * of expired leases is the separate `RunSweeper` port (ADR-0007).
  */
 export type RunRepo = {
   /** Inserts a root run in `queued`; the draft's `id` is caller-generated. */
@@ -46,12 +47,4 @@ export type RunRepo = {
   ): Promise<Run | null>;
   /** Newest first (`queuedAt` desc). */
   listByWorkspace(workspaceId: string, filter: RunListFilter): Promise<Run[]>;
-  /**
-   * Runs stuck in `running` whose lease expired: the orphans the tick
-   * re-enqueues with `run.resume` (§5). No workspace filter on purpose: the
-   * tick is a system sweep over the whole table, not a user request, and
-   * each row carries the `workspaceId` the re-enqueue needs. There is no
-   * session here to scope by, so scoping would be impossible to satisfy.
-   */
-  listExpiredLeases(now: Date): Promise<Run[]>;
 };
