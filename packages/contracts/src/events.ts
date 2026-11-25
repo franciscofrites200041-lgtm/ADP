@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { providerErrorCodeSchema } from "./models.ts";
+
 /**
  * §10 run event protocol, frozen once. WP-30 emits only the agent-level types;
  * the delegation, child and delivery types are declared so the union never
@@ -134,30 +136,14 @@ const runCompletedSchema = z.strictObject({
 });
 
 /**
- * §10 run failure catalog. Wider than `providerErrorCodeSchema` because a run
- * can also fail on an integration or a delivery channel; the Spanish wording
- * for each code lives in the apps, never in the contract.
+ * §10 run failure catalog, imported rather than redeclared: it was two lists
+ * once and they drifted. The Spanish wording for each code lives in the apps,
+ * never in the contract.
  */
-const runErrorCodeSchema = z.enum([
-  "invalid_api_key",
-  "insufficient_quota",
-  "rate_limited",
-  "model_not_found",
-  "context_too_long",
-  "provider_timeout",
-  "provider_unavailable",
-  "content_filtered",
-  "tool_failed",
-  "run_timeout",
-  "limit_reached",
-  "integration_needs_reauth",
-  "delivery_failed",
-  "unknown",
-]);
 
 const runFailedSchema = z.strictObject({
   type: z.literal("run.failed"),
-  code: runErrorCodeSchema,
+  code: providerErrorCodeSchema,
   message: z.string(),
 });
 

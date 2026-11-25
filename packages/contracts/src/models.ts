@@ -35,6 +35,8 @@ export const providerErrorCodeSchema = z.enum([
   "tool_failed",
   "run_timeout",
   "limit_reached",
+  "integration_needs_reauth",
+  "delivery_failed",
   "unknown",
 ]);
 export type ProviderErrorCode = z.infer<typeof providerErrorCodeSchema>;

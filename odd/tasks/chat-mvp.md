@@ -83,7 +83,8 @@ cross-tenant.
 | T5 | Adaptadores: repos Drizzle, event store con `seq`, bus en memoria, background tasks | S4 | `packages/adapters/src` | |
 | T6 | `POST /api/runs` que responde con el stream SSE (D15) | S1 | `apps/api/src/run-routes.ts` | |
 | T7 | `GET /api/runs/:id/events` con `Last-Event-ID`, cancelación y listado | S6, S11 | `apps/api/src/run-routes.ts` | |
-| T8 | Verificación independiente contra §8 y §13 (riesgo alto) | — | — | |
+| T8 | Verificación independiente contra §8 y §13 (riesgo alto) | — | — | `bef234f` |
+| T9 | Pantalla de chat: enviar y ver la respuesta llegar; recargar a mitad de respuesta sin perder texto | S1, S6, S9, S11 | `apps/web/src/app/(app)/chat/**` | |
 
 Decisión resuelta: se adopta `@earendil-works/pi-agent-core@1.1.0`, versión exacta.
 Verificado contra el registro: existe y declara `@earendil-works/pi-ai: ^1.1.0`,
