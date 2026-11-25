@@ -8,7 +8,6 @@ import type {
   LiveEventBus,
   Run,
   RunEventStore,
-  RunListFilter,
   RunRepo,
   RunService,
 } from "@middleware/core";
@@ -16,7 +15,7 @@ import { NotFoundError } from "@middleware/core";
 import { type Context, Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
-
+import { runFailureMessage } from "./messages.ts";
 import { requireOrigin } from "./origin.ts";
 import {
   requireWorkspace,
@@ -86,6 +85,15 @@ type StreamSource = {
 };
 
 /**
+ * The store keeps the engine's code-only event (WP-33); the copy is API-side.
+ * The raw code and the provider's text never reach the client (S2, §8).
+ */
+const toClientEvent = (event: RunEvent): RunEvent =>
+  event.type === "run.failed"
+    ? { ...event, message: runFailureMessage(event.code) }
+    : event;
+
+/**
  * One SSE stream of a run, starting at `fromSeq`. The store is the source of
  * truth: every drain reads it in order, so frames are gap-free even when a
  * live-bus message is missed; the bus only makes the same frames arrive
@@ -103,6 +111,7 @@ function streamRunEvents(
     let done = false;
     let broken = false;
     let draining = false;
+    let terminalTicks = 0;
     let wake: (() => void) | undefined;
 
     const writeFrame = async (seq: number, event: RunEvent) => {
@@ -127,7 +136,7 @@ function streamRunEvents(
       );
       for (const row of rows) {
         if (row.seq <= lastSeq) continue;
-        await writeFrame(row.seq, row.event);
+        await writeFrame(row.seq, toClientEvent(row.event));
         lastSeq = row.seq;
         if (TERMINAL_EVENTS.has(row.event.type)) done = true;
       }
@@ -141,17 +150,34 @@ function streamRunEvents(
         while (!done && !broken) {
           const wrote = await writeStored();
           if (done || broken) break;
-          if (wrote) continue;
+          if (wrote) {
+            terminalTicks = 0;
+            continue;
+          }
           // A terminal row ends the stream even without its terminal event
           // (a broken executor), so no client can hang forever (§10). The
           // event is stored before the row closes (S7), so one more read
-          // here can never skip it.
+          // here can never skip it. The grace of two consecutive empty
+          // polls covers the one live exception: a canceller marks a claimed
+          // run terminal and its executor writes `run.cancelled` at the next
+          // turn boundary (S11) — milliseconds away. A dead writer writes
+          // nothing, ever, so the stream ends instead of polling forever,
+          // and it ends without inventing an event the contract does not
+          // allow (§10).
           const run = await source.runRepo.findById(
             source.workspaceId,
             source.runId,
           );
           if (run !== null && TERMINAL_STATUSES.has(run.status)) {
-            await writeStored();
+            const caught = await writeStored();
+            if (!caught) {
+              terminalTicks += 1;
+              if (terminalTicks >= 2) done = true;
+            } else {
+              terminalTicks = 0;
+            }
+          } else {
+            terminalTicks = 0;
           }
           break;
         }
@@ -272,20 +298,12 @@ function runHandlers(runs: RunRoutesDeps) {
 
     list: async (c: Context<WorkspaceEnv>) => {
       const query = runListQuerySchema.parse(c.req.query());
-      const { agentId, status } = query;
-      const filter: RunListFilter = status === undefined ? {} : { status };
-      const found = await runs.runRepo.listByWorkspace(
-        c.get("workspaceId"),
-        filter,
-      );
-      // The repo filters by status only; the agent filter is a read-side
-      // slice of the same newest-first page (§10).
-      const filtered =
-        agentId === undefined
-          ? found
-          : found.filter((run) => run.agentId === agentId);
-      const page = filtered.slice(0, LIST_LIMIT);
-      return c.json({ runs: page.map(toRunResponse) });
+      const found = await runs.runRepo.listByWorkspace(c.get("workspaceId"), {
+        ...(query.status === undefined ? {} : { status: query.status }),
+        ...(query.agentId === undefined ? {} : { agentId: query.agentId }),
+        limit: LIST_LIMIT,
+      });
+      return c.json({ runs: found.map(toRunResponse) });
     },
   } satisfies Record<string, (c: Context<WorkspaceEnv>) => Promise<Response>>;
 }

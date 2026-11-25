@@ -65,6 +65,12 @@ export type RunOutcome =
 
 export type RunListFilter = {
   status?: RunStatus;
+  /**
+   * Narrows the page to one agent. It is part of the query, not a read-side
+   * slice: filtering after the `limit` cut would hide older matching runs
+   * behind a full page of other agents' rows.
+   */
+  agentId?: string;
   /** Newest first; `limit` caps the page size. */
   limit?: number;
 };

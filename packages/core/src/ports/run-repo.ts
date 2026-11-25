@@ -39,11 +39,31 @@ export type RunRepo = {
     runId: string,
     progress: RunProgress,
   ): Promise<Run | null>;
-  /** Records a terminal state, stamps `finishedAt` and releases the lease. */
+  /**
+   * Records a terminal state, stamps `finishedAt` and releases the lease.
+   * Conditional (S11): a row that already reads terminal is never
+   * overwritten by a later, different terminal state — the call changes
+   * nothing and returns `null`, so the caller can tell it lost the write
+   * (a canceller got there first, or another process closed the run).
+   */
   finish(
     workspaceId: string,
     runId: string,
     outcome: RunOutcome,
+  ): Promise<Run | null>;
+  /**
+   * Inserts a root run in `queued` only while the workspace is under its cap
+   * of simultaneous runs (§10, S10): the count of the workspace's unfinished
+   * runs and the insert are one atomic unit, so a racing pair of starts
+   * cannot both pass. Unfinished — not just `running` — is what counts: a
+   * queued run is about to run, and counting only `running` would let a
+   * racing pair through. Returns `null` when the workspace is at the cap;
+   * the caller renders that as a typed refusal, never as a missing resource.
+   */
+  insertWithinLimit(
+    workspaceId: string,
+    draft: RunDraft,
+    maxSimultaneous: number,
   ): Promise<Run | null>;
   /** Newest first (`queuedAt` desc). */
   listByWorkspace(workspaceId: string, filter: RunListFilter): Promise<Run[]>;

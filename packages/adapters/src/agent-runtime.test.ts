@@ -6,6 +6,7 @@ import {
   fauxText,
   fauxThinking,
   type Message,
+  type SimpleStreamOptions,
   type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import type {
@@ -166,6 +167,43 @@ describe("createPiAgentRuntime", () => {
     // The runtime is stateless: the first request carries only its own turn.
     expect(summarize(seen[0] ?? [])).toEqual(["hola"]);
     expect(summarize(seen[1] ?? [])).toEqual(["hola", "primera", "seguimos"]);
+  });
+
+  it("passes the version's params into the provider stream (S3)", async () => {
+    const { runtime, faux } = createFauxRuntime();
+    // The faux factory receives the stream options each request carried.
+    const seenOptions: (SimpleStreamOptions | undefined)[] = [];
+    faux.setResponses([
+      (_context, options) => {
+        seenOptions.push(options);
+        return fauxAssistantMessage([fauxText("listo")]);
+      },
+    ]);
+    const events = await collectEvents(runtime, {
+      model: fauxTarget(),
+      params: { temperature: 0.3 },
+      messages: [{ role: "user", text: "hola" }],
+    });
+    expect(expectDone(events).output).toBe("listo");
+    expect(seenOptions[0]?.temperature).toBe(0.3);
+  });
+
+  it("fails the turn loudly when the params do not honour the contract", async () => {
+    const { runtime, faux } = createFauxRuntime();
+    const events = await collectEvents(runtime, {
+      model: fauxTarget(),
+      // A row a broken write could have produced: temperature out of range.
+      params: {
+        temperature: 99,
+      } as unknown as NonNullable<AgentRuntimeTurn["params"]>,
+      messages: [{ role: "user", text: "hola" }],
+    });
+    // Not ignored: the turn errors instead of running on rogue values, and
+    // the provider was never called.
+    expect(events).toEqual([
+      { type: "error", code: "unknown", message: "unknown" },
+    ]);
+    expect(faux.state.callCount).toBe(0);
   });
 
   it("passes the system prompt to the provider", async () => {

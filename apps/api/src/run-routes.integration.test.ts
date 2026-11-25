@@ -13,7 +13,12 @@ import {
 import type { AgentRuntime } from "@middleware/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
-
+import {
+  type RunFailureCode,
+  runFailureFallbackMessage,
+  runFailureMessage,
+  runFailureMessages,
+} from "./messages.ts";
 import {
   createIntegrationHarness,
   TEST_ORIGIN,
@@ -83,6 +88,25 @@ const enqueueGatedReply = (
 };
 
 type SseFrame = { id: number; event: string; data: unknown };
+
+/** Every §10 failure code renders its own Spanish sentence, never the code. */
+describe("run failure copy", () => {
+  it.each(Object.keys(runFailureMessages) as RunFailureCode[])(
+    "maps %s to its Spanish sentence",
+    (code) => {
+      const message = runFailureMessage(code);
+      expect(message).toBe(runFailureMessages[code]);
+      expect(message).not.toEqual(code);
+      expect(message.length).toBeGreaterThan(0);
+    },
+  );
+
+  it("falls back to a generic Spanish sentence for a code with no entry", () => {
+    const message = runFailureMessage("codigo_que_no_existe");
+    expect(message).toBe(runFailureFallbackMessage);
+    expect(message).not.toContain("codigo_que_no_existe");
+  });
+});
 
 const parseFrame = (block: string): SseFrame => {
   let id = -1;
@@ -346,6 +370,62 @@ describe.skipIf(url === undefined)("run routes (postgres)", () => {
     expectGapless(frames);
     expect(frames[0]?.event).toBe("run.started");
     expect(frames.at(-1)?.event).toBe("run.completed");
+  });
+
+  it("ends the stream when the run row is terminal without its terminal event", async () => {
+    enqueueReply(faux, "Sin cierre.");
+    const streamed = await startRun(ana, "Sin evento final");
+    const frames = await readFrames(bodyReader(streamed), 1000);
+    const runId = runIdOf(frames[0]);
+    expect(frames.at(-1)?.event).toBe("run.completed");
+
+    // Wedged writer: the run row stays terminal but its terminal event
+    // disappears from the store — exactly what a broken executor leaves
+    // behind (§10).
+    await harness.sql`delete from run_event
+      where workspace_id = ${ana.workspaceId}
+        and run_id = ${runId}
+        and type = 'run.completed'`;
+    const withoutTerminal = frames.filter(
+      (frame) => frame.event !== "run.completed",
+    );
+    const lastId = withoutTerminal.at(-1)?.id ?? 0;
+
+    // Reconnecting from the last surviving frame: the store has nothing new
+    // and the row is terminal, so the reader must see the stream end instead
+    // of polling forever — and no invented event may arrive (§10).
+    const resumed = await call(
+      ana,
+      "GET",
+      `/api/runs/${runId}/events`,
+      undefined,
+      { "last-event-id": String(lastId) },
+    );
+    expect(resumed.status).toBe(200);
+    const tail = await readFrames(bodyReader(resumed), 1000);
+    expect(tail).toEqual([]);
+  });
+
+  it("renders run.failed with the Spanish copy of its code", async () => {
+    faux.setResponses([
+      fauxAssistantMessage([], {
+        stopReason: "error",
+        errorMessage: "401: Incorrect API key provided",
+      }),
+    ]);
+
+    const res = await startRun(ana, "Fallame");
+    const frames = await readFrames(bodyReader(res), 1000);
+    const last = frames.at(-1);
+    if (last === undefined) throw new Error("stream was empty");
+    const failed = runEventSchema.parse(last.data);
+    if (failed.type !== "run.failed") throw new Error("wrong terminal event");
+
+    expect(failed.code).toBe("invalid_api_key");
+    expect(failed.message).toBe(runFailureMessages.invalid_api_key);
+    // Never the raw code, never the provider's text (S2, §8).
+    expect(failed.message).not.toContain("invalid_api_key");
+    expect(failed.message).not.toContain("401");
   });
 
   it("cancelling a run produces run.cancelled", async () => {

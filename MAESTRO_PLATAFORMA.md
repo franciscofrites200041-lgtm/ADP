@@ -1101,8 +1101,8 @@ WP-06 no espera a nadie: sigue en curso mientras se hace WP-A0, y WP-00 no lo to
 | Q6 | Límites por defecto por workspace (ejecuciones, tareas, tokens) | Los de §5 | Ale (relación con precios) |
 | Q7 | Público objetivo y plantillas finales | Las 6 plantillas de WP-21 | Ale |
 | Q8 | ¿Gondolin entra al MVP? | No; WP-45 queda opcional | Luca |
-| Q9 | Verificación de la app en Google (permisos sensibles `calendar.readonly` y `gmail.send`): requiere dominio propio, política de privacidad publicada y un video de uso | Modo prueba con los usuarios de prueba cargados en la consola de Google | Luca (técnico) y Ale (textos legales) |
-| Q10 | WhatsApp Business: cuenta de Meta verificada, número de la empresa y aprobación de la plantilla `resumen_listo`. Cada plantilla enviada se cobra; definir si se incluye en el precio | Adaptador WhatsApp desactivado por flag hasta tener credenciales; en desarrollo, un adaptador de consola | Luca y Ale |
+| Q9 | Verificación de la app en Google (permisos sensibles `calendar.readonly` y `gmail.send`): requiere dominio propio, política de privacidad publicada y un video de uso. **Resuelto por el dueño: no se verifica, la usan dos personas conocidas** (ADR-0008) | App **publicada sin verificar**, no modo prueba: en Testing el refresh token vence a los 7 días y la tarea diaria se rompe cada semana | Luca (técnico) y Ale (textos legales) |
+| Q10 | WhatsApp Business: cuenta de Meta verificada, número de la empresa y aprobación de la plantilla `resumen_listo`. Cada plantilla enviada se cobra; definir si se incluye en el precio. **Resuelto por el dueño: se usa la cuenta de una empresa ya verificada como proveedor** (ADR-0009) | Adaptador WhatsApp desactivado por flag hasta tener credenciales; en desarrollo, un adaptador de consola. El puerto no cambia: cambian credenciales, número y quién administra la plantilla | Luca y Ale |
 | Q11 | ¿Modos "cadena de pasos" y "paralelo con combinación" para grupos? | Fuera del MVP; `agent_group.mode` ya los reserva | Luca |
 
 ---

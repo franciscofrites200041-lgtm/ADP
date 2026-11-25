@@ -1,12 +1,14 @@
 import type {
+  AgentParams,
   CreateRunRequest,
   ProviderErrorCode,
   RunCheckpoint,
   RunEvent,
 } from "@middleware/contracts";
+import { agentParamsSchema } from "@middleware/contracts";
 import type { Message } from "../domain/conversation.ts";
-import { NotFoundError } from "../domain/errors.ts";
-import type { Run, RunDraft, RunProgress } from "../domain/run.ts";
+import { DomainError, NotFoundError } from "../domain/errors.ts";
+import type { Run, RunDraft, RunOutcome, RunProgress } from "../domain/run.ts";
 import type { AgentRepo } from "../ports/agent-repo.ts";
 import type {
   AgentRuntime,
@@ -38,6 +40,8 @@ export type RunLimits = {
   leaseRenewalMs: number;
   leaseDurationMs: number;
   deltaFlushMs: number;
+  /** §10, S10: at most this many of a workspace's runs may be unfinished. */
+  maxSimultaneousRuns: number;
 };
 
 export const DEFAULT_RUN_LIMITS: RunLimits = {
@@ -46,7 +50,20 @@ export const DEFAULT_RUN_LIMITS: RunLimits = {
   leaseRenewalMs: 30_000,
   leaseDurationMs: 90_000,
   deltaFlushMs: 250,
+  maxSimultaneousRuns: 5,
 };
+
+/**
+ * A workspace at its §10 cap of simultaneous runs (S10). A quota, so it is
+ * the caller's mistake: the route renders it by `code` like any other
+ * rejected request. `message` stays internal and never reaches a client.
+ */
+export class RunConcurrencyLimitError extends DomainError {
+  constructor(limit: number) {
+    super("forbidden", `run_concurrency_limit:${limit}`);
+    this.name = "RunConcurrencyLimitError";
+  }
+}
 
 /** Table of the sealed credential the secret vault opens (S3). */
 const CREDENTIAL_TABLE = "provider_credential";
@@ -145,6 +162,28 @@ export function createRunService(deps: RunServiceDeps): RunService {
   };
 
   /**
+   * INVARIANT (S6): the terminal event (`run.completed` / `run.failed` /
+   * `run.cancelled`) is durable in the event store BEFORE the run row's
+   * status flips. A reader that sees the row read terminal can then replay
+   * the run to its end without ever waiting for an event that is still
+   * coming. Every engine terminal write goes through here — nothing else in
+   * the engine may call `runRepo.finish`.
+   */
+  const finishTerminal = async (
+    run: Run,
+    events: readonly RunEvent[],
+    outcome: RunOutcome,
+  ): Promise<Run | null> => {
+    await emit(run.workspaceId, run.id, events);
+    const finished = await runRepo.finish(run.workspaceId, run.id, outcome);
+    if (finished) return finished;
+    // The port refuses to overwrite a terminal row (S11): another writer —
+    // a canceller, or the process that closed the run after a fault — got
+    // there first. Report the row that actually won, never a silent `null`.
+    return await runRepo.findById(run.workspaceId, run.id);
+  };
+
+  /**
    * The provider failed and the run ends `failed`. The event carries the code
    * only: the Spanish wording lives in the messages file of the layer that
    * renders it (WP-33), and the provider's raw text never does (S2, §8).
@@ -152,16 +191,12 @@ export function createRunService(deps: RunServiceDeps): RunService {
   const finishFailed = async (
     run: Run,
     code: ProviderErrorCode,
-  ): Promise<Run | null> => {
-    await emit(run.workspaceId, run.id, [
-      { type: "run.failed", code, message: code },
-    ]);
-    return await runRepo.finish(run.workspaceId, run.id, {
+  ): Promise<Run | null> =>
+    await finishTerminal(run, [{ type: "run.failed", code, message: code }], {
       status: "failed",
       errorCode: code,
       errorMessage: code,
     });
-  };
 
   /**
    * The engine never throws: an unexpected failure (a broken port, an
@@ -174,6 +209,9 @@ export function createRunService(deps: RunServiceDeps): RunService {
     runId: string,
   ): Promise<Run | null> => {
     try {
+      // The same S6 invariant as every terminal path: the terminal event is
+      // durable before the row's status flips — even on the best-effort
+      // path, where the fault may be the store itself.
       await emit(workspaceId, runId, [
         { type: "run.failed", code: "unknown", message: "unknown" },
       ]);
@@ -182,11 +220,13 @@ export function createRunService(deps: RunServiceDeps): RunService {
       // still gets closed.
     }
     try {
-      return await runRepo.finish(workspaceId, runId, {
+      const finished = await runRepo.finish(workspaceId, runId, {
         status: "failed",
         errorCode: "unknown",
         errorMessage: "unknown",
       });
+      if (finished) return finished;
+      return await runRepo.findById(workspaceId, runId);
     } catch {
       return null;
     }
@@ -242,6 +282,11 @@ export function createRunService(deps: RunServiceDeps): RunService {
       run.agentVersionId,
     );
     if (!version) return await finishFailed(run, "unknown");
+    // The version's model params are a contract shape (S3): a row that does
+    // not honour it fails the run loudly instead of running on silent
+    // defaults — or on whatever the provider does with a rogue value.
+    const parsedParams = agentParamsSchema.safeParse(version.params);
+    if (!parsedParams.success) return await finishFailed(run, "unknown");
     const stored =
       version.credentialId === null
         ? null
@@ -335,6 +380,7 @@ export function createRunService(deps: RunServiceDeps): RunService {
       model: ModelTarget;
       systemPrompt: string;
       messages: readonly RuntimeMessage[];
+      params: AgentParams;
       messageId: string;
       deadlineMs: number;
     }): Promise<TurnResult> => {
@@ -342,6 +388,9 @@ export function createRunService(deps: RunServiceDeps): RunService {
         model: turnInput.model,
         systemPrompt: turnInput.systemPrompt,
         messages: turnInput.messages,
+        // The agent version's own params (S3): temperature and whatever else
+        // the contract allows reach the provider request through the port.
+        params: turnInput.params,
       });
       const iterator = events[Symbol.asyncIterator]();
       const timeout = deadlineTimer(turnInput.deadlineMs);
@@ -410,8 +459,8 @@ export function createRunService(deps: RunServiceDeps): RunService {
         const current = await runRepo.findById(workspaceId, runId);
         if (current?.status === "cancelled") {
           await flushDeltas();
-          await emit(workspaceId, runId, [{ type: "run.cancelled" }]);
-          return await runRepo.finish(workspaceId, runId, {
+          // The S6 invariant: the terminal event first, the row flip after.
+          return await finishTerminal(run, [{ type: "run.cancelled" }], {
             status: "cancelled",
             output: lastOutput,
           });
@@ -436,6 +485,7 @@ export function createRunService(deps: RunServiceDeps): RunService {
           model,
           systemPrompt: version.instructions,
           messages: transcript,
+          params: parsedParams.data,
           messageId,
           deadlineMs: timeLeftMs(),
         });
@@ -489,6 +539,11 @@ export function createRunService(deps: RunServiceDeps): RunService {
         lastOutput = turn.output;
         // The checkpoint is the contract shape a resume reads (WP-50): the
         // transcript so far; the turn count lives in its own column.
+        // Deferred to WP-50, deliberately: the read side of this shape — the
+        // recovery that re-enqueues a run and replays from its checkpoint —
+        // is not built yet. Until it lands, a re-claimed run restarts from
+        // the conversation transcript in the message store, and `checkpoint`
+        // is written but never read.
         const checkpoint: RunCheckpoint = { transcript: [...transcript] };
         const progress: RunProgress = {
           checkpoint,
@@ -497,19 +552,22 @@ export function createRunService(deps: RunServiceDeps): RunService {
         await runRepo.saveProgress(workspaceId, runId, progress);
       }
 
-      // The transcript ends with the assistant reply: that is the output.
-      const output = lastOutput ?? "";
-      await emit(workspaceId, runId, [
-        {
-          type: "run.completed",
-          output,
-          finishedAt: clock.now().toISOString(),
-        },
-      ]);
-      return await runRepo.finish(workspaceId, runId, {
-        status: "succeeded",
-        output,
-      });
+      // A run without assistant text is never a success with an empty
+      // output: an empty transcript (nothing to answer) or an empty reply
+      // means the turn pipeline produced nothing, and the run says so (§5).
+      if (!lastOutput) return await finishFailed(run, "unknown");
+      // The S6 invariant: the terminal event first, the row flip after.
+      return await finishTerminal(
+        run,
+        [
+          {
+            type: "run.completed",
+            output: lastOutput,
+            finishedAt: clock.now().toISOString(),
+          },
+        ],
+        { status: "succeeded", output: lastOutput },
+      );
     } finally {
       // Stop renewing and flushing: the run has left the loop (§5).
       clearInterval(renewTimer);
@@ -574,7 +632,13 @@ export function createRunService(deps: RunServiceDeps): RunService {
     }
 
     // The run row pins the current version, so a later edit never rewrites
-    // what an execution runs (S3).
+    // what an execution runs (S3). The §10 cap (S10) is enforced inside the
+    // same unit as the insert: the workspace's unfinished runs are counted
+    // there, a racing pair of starts cannot both pass, and a workspace at
+    // the cap gets a typed refusal. A refused start may leave the
+    // conversation it just opened: the cap counts unfinished runs, so the
+    // check must be atomic with the run's insert, and an empty conversation
+    // is harmless.
     const runId = idGen.newId();
     const draft: RunDraft = {
       id: runId,
@@ -585,7 +649,13 @@ export function createRunService(deps: RunServiceDeps): RunService {
       trigger: "chat",
       input: input.input,
     };
-    await runRepo.insert(workspaceId, draft);
+    const inserted = await runRepo.insertWithinLimit(
+      workspaceId,
+      draft,
+      limits.maxSimultaneousRuns,
+    );
+    if (!inserted)
+      throw new RunConcurrencyLimitError(limits.maxSimultaneousRuns);
     await messageRepo.append(workspaceId, {
       id: idGen.newId(),
       conversationId,

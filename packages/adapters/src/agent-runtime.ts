@@ -9,6 +9,7 @@ import {
   type Usage,
 } from "@earendil-works/pi-ai";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
+import { agentParamsSchema } from "@middleware/contracts";
 import type {
   AgentRuntime,
   AgentRuntimeEvent,
@@ -149,6 +150,22 @@ async function prepareTurn(
       "A turn needs at least one message",
     );
   }
+  // The boundary check for the version's params (S3): a row that does not
+  // honour the contract is a broken invariant — it fails the turn loudly
+  // instead of running on whatever the provider does with a rogue value.
+  let modelParams: AgentRuntimeTurn["params"];
+  if (input.params === undefined) {
+    modelParams = undefined;
+  } else {
+    const parsed = agentParamsSchema.safeParse(input.params);
+    if (!parsed.success) {
+      throw new InvariantError(
+        "turn_params_invalid",
+        "The turn's params do not honour the contract",
+      );
+    }
+    modelParams = parsed.data;
+  }
   const last = input.messages.at(-1);
   if (last === undefined || last.role === "assistant") {
     // A caller bug in the engine's loop, never a user outcome (§10).
@@ -202,11 +219,20 @@ async function prepareTurn(
   const resolvedModel: PiChatModel = model;
 
   // The key goes with every request explicitly, and compatible endpoints
-  // always stream through the pinned-address client (§8).
+  // always stream through the pinned-address client (§8). The version's own
+  // params (S3) ride the stream options: they are how the agent version's
+  // temperature and token cap reach the provider request.
+  const params = modelParams;
   const safeFetch = deps.safeFetch;
   const streamFn: StreamFn = (requestModel, context, options) =>
     models.streamSimple(requestModel, context, {
       ...options,
+      ...(params?.temperature === undefined
+        ? {}
+        : { temperature: params.temperature }),
+      ...(params?.maxTokens === undefined
+        ? {}
+        : { maxTokens: params.maxTokens }),
       apiKey: credential.apiKey,
       ...(safeFetch === undefined ? {} : { fetch: safeFetch }),
     });

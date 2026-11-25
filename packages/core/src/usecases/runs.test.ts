@@ -1,7 +1,11 @@
-import type { CreateRunRequest, RunEvent } from "@middleware/contracts";
+import type {
+  AgentParams,
+  CreateRunRequest,
+  RunEvent,
+} from "@middleware/contracts";
 import { describe, expect, it, vi } from "vitest";
-
 import type { Conversation } from "../domain/conversation.ts";
+import type { RunDraft } from "../domain/run.ts";
 import type { UsageRecord, UsageRecordDraft } from "../domain/usage.ts";
 import type {
   AgentRuntime,
@@ -11,6 +15,7 @@ import type {
 } from "../ports/agent-runtime.ts";
 import type { ConversationRepo } from "../ports/conversation-repo.ts";
 import type { MessageRepo } from "../ports/message-repo.ts";
+import type { RunRepo } from "../ports/run-repo.ts";
 import type { UsageRepo } from "../ports/usage-repo.ts";
 import { createInMemoryAgentRepo } from "../testing/in-memory-agent-ports.ts";
 import { createInMemoryPorts } from "../testing/in-memory-ports.ts";
@@ -68,12 +73,16 @@ type ScriptedTurn = {
   crash?: Error;
 };
 
-function scriptedRuntime(script: readonly ScriptedTurn[]): AgentRuntime {
+function scriptedRuntime(
+  script: readonly ScriptedTurn[],
+  seenTurns?: AgentRuntimeTurn[],
+): AgentRuntime {
   let index = 0;
   return {
     async *streamTurn(
-      _turn: AgentRuntimeTurn,
+      turn: AgentRuntimeTurn,
     ): AsyncGenerator<AgentRuntimeEvent> {
+      seenTurns?.push(turn);
       const step = script[index];
       index += 1;
       if (step === undefined) {
@@ -212,12 +221,41 @@ function createSetup(
   const usageRepo = createInMemoryUsageRepo();
   const runtime =
     options.runtime ?? scriptedRuntime([{ deltas: ["hola ", "mundo"] }]);
+  // The S6 invariant watcher: while `terminalEventCheck.required` is on,
+  // every `runRepo.finish` the engine performs asserts that the run's
+  // terminal event is already durable in the store — the row must never
+  // flip terminal before its event exists. Violations are recorded instead
+  // of thrown, because `finishUnexpectedly` swallows failures on purpose.
+  const terminalEventCheck: { required: boolean } = { required: false };
+  const terminalEventViolations: string[] = [];
+  const watchedRunRepo: RunRepo = {
+    ...runRepo,
+    finish: async (workspaceId, runId, outcome) => {
+      if (terminalEventCheck.required) {
+        const stored = runEventStore.events
+          .filter((row) => row.runId === runId)
+          .map((row) => row.event);
+        const terminalEvent =
+          outcome.status === "succeeded"
+            ? "run.completed"
+            : outcome.status === "failed"
+              ? "run.failed"
+              : "run.cancelled";
+        if (!stored.some((event) => event.type === terminalEvent)) {
+          terminalEventViolations.push(
+            `finish(${outcome.status}) flipped the row without ${terminalEvent} in the store`,
+          );
+        }
+      }
+      return runRepo.finish(workspaceId, runId, outcome);
+    },
+  };
   const service = createRunService({
     agentRepo,
     credentialRepo: ports.deps.credentialRepo,
     conversationRepo,
     messageRepo,
-    runRepo,
+    runRepo: watchedRunRepo,
     runEventStore,
     liveEventBus,
     backgroundTasks,
@@ -241,13 +279,19 @@ function createSetup(
     conversationRepo,
     messageRepo,
     usageRepo,
+    terminalEventCheck,
+    terminalEventViolations,
   };
 }
 
 type Setup = ReturnType<typeof createSetup>;
 
 /** Agent + active credential, sealed through the fake vault. */
-async function seedAgent(setup: Setup, workspaceId: string) {
+async function seedAgent(
+  setup: Setup,
+  workspaceId: string,
+  params: AgentParams = {},
+) {
   const credentialId = setup.idGen.newId();
   const secret = await setup.secretVault.seal(
     workspaceId,
@@ -289,7 +333,7 @@ async function seedAgent(setup: Setup, workspaceId: string) {
       providerId: "openai",
       modelId: "gpt-5",
       credentialId,
-      params: {},
+      params,
       tools: [],
     },
   );
@@ -758,5 +802,315 @@ describe("executeRun", () => {
 
     expect(finished?.status).toBe("failed");
     expect(finished?.errorCode).toBe("unknown");
+  });
+});
+
+describe("terminal event before the row flips (S6 invariant)", () => {
+  it("writes run.completed before the row reads succeeded", async () => {
+    const s = createSetup();
+    const ws = WORKSPACE_A;
+    const { agentId, versionId } = await seedAgent(s, ws);
+    const runId = seedRun(s, { workspaceId: ws, agentId, versionId });
+    s.terminalEventCheck.required = true;
+
+    const finished = await s.service.executeRun(ws, runId);
+
+    expect(finished?.status).toBe("succeeded");
+    expect(s.terminalEventViolations).toEqual([]);
+  });
+
+  it("writes run.failed before the row reads failed", async () => {
+    const s = createSetup({
+      runtime: scriptedRuntime([{ error: "rate_limited" }]),
+    });
+    const ws = WORKSPACE_A;
+    const { agentId, versionId } = await seedAgent(s, ws);
+    const runId = seedRun(s, { workspaceId: ws, agentId, versionId });
+    s.terminalEventCheck.required = true;
+
+    const finished = await s.service.executeRun(ws, runId);
+
+    expect(finished?.status).toBe("failed");
+    expect(finished?.errorCode).toBe("rate_limited");
+    expect(s.terminalEventViolations).toEqual([]);
+  });
+});
+
+describe("terminal event before the row flips (S6 invariant), part 2", () => {
+  it("writes run.cancelled before the row reads cancelled", async () => {
+    const gate = deferred();
+    const s = createSetup({
+      runtime: scriptedRuntime([{ deltas: ["hola"], gate: gate.promise }]),
+    });
+    const ws = WORKSPACE_A;
+    const { agentId, versionId } = await seedAgent(s, ws);
+    const runId = seedRun(s, { workspaceId: ws, agentId, versionId });
+    // Armed from the start: the checker only sees the engine's finishes —
+    // the test's own cancelling write below goes through the raw repo.
+    s.terminalEventCheck.required = true;
+
+    const execution = s.service.executeRun(ws, runId);
+    await vi.waitFor(() => {
+      expect(s.runEventStore.events.length).toBeGreaterThan(0);
+    });
+    await s.runRepo.finish(ws, runId, {
+      status: "cancelled",
+      output: null,
+    });
+    gate.open();
+    const finished = await execution;
+
+    expect(finished?.status).toBe("cancelled");
+    expect(s.terminalEventViolations).toEqual([]);
+  });
+
+  it("finishUnexpectedly also writes the event before the row flip", async () => {
+    const s = createSetup({
+      runtime: scriptedRuntime([
+        { deltas: ["hola"], crash: new Error("boom") },
+      ]),
+    });
+    const ws = WORKSPACE_A;
+    const { agentId, versionId } = await seedAgent(s, ws);
+    const runId = seedRun(s, { workspaceId: ws, agentId, versionId });
+    s.terminalEventCheck.required = true;
+
+    const finished = await s.service.executeRun(ws, runId);
+
+    expect(finished?.status).toBe("failed");
+    expect(finished?.errorCode).toBe("unknown");
+    expect(s.terminalEventViolations).toEqual([]);
+  });
+});
+
+describe("agent version params reach the runtime (S3)", () => {
+  it("carries a non-default temperature through the turn", async () => {
+    const turns: AgentRuntimeTurn[] = [];
+    const s = createSetup({
+      runtime: scriptedRuntime([{ deltas: ["hola"] }], turns),
+    });
+    const ws = WORKSPACE_A;
+    const { agentId, versionId } = await seedAgent(s, ws, {
+      temperature: 0.3,
+    });
+    const runId = seedRun(s, { workspaceId: ws, agentId, versionId });
+
+    const finished = await s.service.executeRun(ws, runId);
+
+    expect(finished?.status).toBe("succeeded");
+    expect(turns[0]?.params).toEqual({ temperature: 0.3 });
+  });
+
+  it("fails the run loudly when the params row does not honour the contract", async () => {
+    const turns: AgentRuntimeTurn[] = [];
+    const s = createSetup({
+      runtime: scriptedRuntime([{ deltas: ["hola"] }], turns),
+    });
+    const ws = WORKSPACE_A;
+    // A row a broken write could have produced: temperature out of range.
+    const { agentId, versionId } = await seedAgent(s, ws, {
+      temperature: 99,
+    } as unknown as AgentParams);
+    const runId = seedRun(s, { workspaceId: ws, agentId, versionId });
+
+    const finished = await s.service.executeRun(ws, runId);
+
+    // Not ignored: the run never reaches the provider and ends failed.
+    expect(finished?.status).toBe("failed");
+    expect(finished?.errorCode).toBe("unknown");
+    expect(turns).toEqual([]);
+    const types = eventTypesOf(s, runId);
+    expect(types).toContain("run.failed");
+    expect(types).not.toContain("run.completed");
+  });
+});
+
+describe("the §10 cap of simultaneous runs per workspace (S10)", () => {
+  it("admits the 5th running run and refuses the 6th with a typed, renderable error", async () => {
+    const gate = deferred();
+    const s = createSetup({
+      runtime: scriptedRuntime([{ deltas: ["hola"], gate: gate.promise }]),
+    });
+    const ws = WORKSPACE_A;
+    const { agentId, versionId } = await seedAgent(s, ws);
+    for (let i = 0; i < 4; i += 1) {
+      seedRun(s, {
+        workspaceId: ws,
+        agentId,
+        versionId,
+        status: "running",
+        leaseUntil: new Date(BASE_TIME.getTime() + 60_000),
+        startedAt: BASE_TIME,
+      });
+    }
+
+    const fifth = await s.service.startRun(ws, USER, {
+      agentId,
+      input: "hola",
+    });
+    await vi.waitFor(() => {
+      expect(runOf(s, fifth.runId).status).toBe("running");
+    });
+
+    await expect(
+      s.service.startRun(ws, USER, { agentId, input: "otra" }),
+    ).rejects.toMatchObject({
+      code: "forbidden",
+      name: "RunConcurrencyLimitError",
+    });
+
+    gate.open();
+    await expect(s.backgroundTasks.drain(1000)).resolves.toBe(true);
+    expect(runOf(s, fifth.runId).status).toBe("succeeded");
+  });
+});
+
+describe("mid-turn races and timers (§5, S4)", () => {
+  it("finishes run_timeout when the deadline passes mid-turn, not only at the boundary", async () => {
+    const gate = deferred();
+    const s = createSetup({
+      limits: testLimits({ timeoutMs: 50 }),
+      runtime: scriptedRuntime([{ deltas: ["hola"], gate: gate.promise }]),
+    });
+    const ws = WORKSPACE_A;
+    const { agentId, versionId } = await seedAgent(s, ws);
+    const runId = seedRun(s, { workspaceId: ws, agentId, versionId });
+    s.terminalEventCheck.required = true;
+
+    const execution = s.service.executeRun(ws, runId);
+    // The deadline (50 ms) fires while the turn is still gated open: the
+    // engine abandons the stream mid-turn. The scripted generator only
+    // settles when the gate opens (a real provider settles on abort), so
+    // open it once the deadline has clearly fired.
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    gate.open();
+    const finished = await execution;
+
+    expect(finished?.status).toBe("failed");
+    expect(finished?.errorCode).toBe("run_timeout");
+    expect(s.terminalEventViolations).toEqual([]);
+    // The buffered delta is flushed on the way out, before run.failed.
+    expect(eventTypesOf(s, runId)).toEqual([
+      "run.started",
+      "message.delta",
+      "run.failed",
+    ]);
+  });
+
+  it("flushes buffered deltas on the delta-flush timer while the turn is still open", async () => {
+    const gate = deferred();
+    const s = createSetup({
+      limits: testLimits({ deltaFlushMs: 10 }),
+      runtime: scriptedRuntime([
+        { deltas: ["hola", " mundo"], gate: gate.promise },
+      ]),
+    });
+    const ws = WORKSPACE_A;
+    const { agentId, versionId } = await seedAgent(s, ws);
+    const runId = seedRun(s, { workspaceId: ws, agentId, versionId });
+
+    const execution = s.service.executeRun(ws, runId);
+    // The timer flush lands while the turn is still in flight: the event is
+    // in the store before the turn ends.
+    await vi.waitFor(() => {
+      expect(eventTypesOf(s, runId)).toContain("message.delta");
+    });
+    expect(eventTypesOf(s, runId)).not.toContain("message.completed");
+
+    gate.open();
+    const finished = await execution;
+
+    expect(finished?.status).toBe("succeeded");
+    // The turn-end flush does not repeat the timer's batch: exactly one
+    // delta event, with the whole text.
+    const types = eventTypesOf(s, runId);
+    expect(types.filter((type) => type === "message.delta")).toHaveLength(1);
+    const delta = eventsOf(s, runId).find(
+      (event) => event.type === "message.delta",
+    );
+    expect(delta).toEqual({
+      type: "message.delta",
+      messageId: expect.any(String),
+      text: "hola mundo",
+    });
+  });
+});
+
+describe("in-memory run repo contract", () => {
+  const draft = (id: string): RunDraft => ({
+    id,
+    workspaceId: WORKSPACE_A,
+    agentId: "agent-1",
+    agentVersionId: "version-1",
+    conversationId: null,
+    trigger: "chat",
+    input: "hola",
+  });
+  const soon = new Date(BASE_TIME.getTime() + 60_000);
+
+  it("finish refuses to overwrite a terminal row with another terminal state (S11)", async () => {
+    const repo = createInMemoryRunRepo(clock);
+    const run = await repo.insert(WORKSPACE_A, draft("run-1"));
+    const cancelled = await repo.finish(WORKSPACE_A, run.id, {
+      status: "cancelled",
+      output: null,
+    });
+    expect(cancelled?.status).toBe("cancelled");
+
+    // A later, different terminal state changes nothing — and the caller
+    // can tell: the port answers null, not the row it refused to write.
+    const overwritten = await repo.finish(WORKSPACE_A, run.id, {
+      status: "failed",
+      errorCode: "run_timeout",
+      errorMessage: "run_timeout",
+    });
+    expect(overwritten).toBeNull();
+
+    const row = await repo.findById(WORKSPACE_A, run.id);
+    expect(row?.status).toBe("cancelled");
+    expect(row?.output).toBeNull();
+    expect(row?.errorCode).toBeNull();
+    expect(row?.errorMessage).toBeNull();
+    expect(row?.finishedAt).toEqual(cancelled?.finishedAt);
+  });
+
+  it("insertWithinLimit: a racing pair cannot both pass (S10)", async () => {
+    const repo = createInMemoryRunRepo(clock);
+    for (let i = 0; i < 4; i += 1) {
+      const run = await repo.insert(WORKSPACE_A, draft(`running-${i}`));
+      await repo.claimLease(WORKSPACE_A, run.id, soon);
+    }
+
+    const [a, b] = await Promise.all([
+      repo.insertWithinLimit(WORKSPACE_A, draft("race-a"), 5),
+      repo.insertWithinLimit(WORKSPACE_A, draft("race-b"), 5),
+    ]);
+
+    // Exactly one of the two racing starts got a row.
+    expect(a === null).not.toBe(b === null);
+    expect((a ?? b)?.status).toBe("queued");
+  });
+
+  it("insertWithinLimit counts unfinished runs and lets finished runs free the slot", async () => {
+    const repo = createInMemoryRunRepo(clock);
+    for (let i = 0; i < 4; i += 1) {
+      const run = await repo.insert(WORKSPACE_A, draft(`running-${i}`));
+      await repo.claimLease(WORKSPACE_A, run.id, soon);
+    }
+
+    const fifth = await repo.insertWithinLimit(WORKSPACE_A, draft("fifth"), 5);
+    expect(fifth?.status).toBe("queued");
+    expect(
+      await repo.insertWithinLimit(WORKSPACE_A, draft("sixth"), 5),
+    ).toBeNull();
+
+    // The 5th finishes: its slot frees up for the next start.
+    await repo.finish(WORKSPACE_A, "fifth", {
+      status: "succeeded",
+      output: "listo",
+    });
+    expect(
+      await repo.insertWithinLimit(WORKSPACE_A, draft("sixth"), 5),
+    ).not.toBeNull();
   });
 });

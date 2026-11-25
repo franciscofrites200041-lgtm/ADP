@@ -1,4 +1,4 @@
-import type { ProviderErrorCode } from "@middleware/contracts";
+import type { AgentParams, ProviderErrorCode } from "@middleware/contracts";
 
 import type { ModelTarget } from "./model-gateway.ts";
 
@@ -35,6 +35,13 @@ export type AgentRuntimeTurn = {
   model: ModelTarget;
   systemPrompt?: string | undefined;
   messages: readonly RuntimeMessage[];
+  /**
+   * The agent version's own model params (S3): temperature and whatever else
+   * the contract allows. The runtime validates the shape at this boundary
+   * and passes it into the provider request; an invalid shape fails the
+   * turn loudly, never as silent defaults.
+   */
+  params?: AgentParams;
 };
 
 /**

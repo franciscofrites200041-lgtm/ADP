@@ -34,6 +34,9 @@ const RESUMABLE: readonly Run["status"][] = [
   "waiting_approval",
 ];
 
+/** The three terminal statuses: a terminal row is closed for good (S11). */
+const TERMINAL: readonly Run["status"][] = ["succeeded", "failed", "cancelled"];
+
 const isResumable = (run: Run | undefined): run is Run =>
   run !== undefined && RESUMABLE.includes(run.status);
 
@@ -56,29 +59,46 @@ export function createInMemoryRunRepo(
   const find = (workspaceId: string, runId: string) =>
     runs.find((run) => run.workspaceId === workspaceId && run.id === runId);
 
+  const buildRun = (draft: RunDraft): Run => ({
+    id: draft.id,
+    workspaceId: draft.workspaceId,
+    agentId: draft.agentId,
+    agentVersionId: draft.agentVersionId,
+    conversationId: draft.conversationId,
+    status: "queued",
+    input: draft.input,
+    output: null,
+    errorCode: null,
+    errorMessage: null,
+    turnsCompleted: 0,
+    checkpoint: null,
+    leaseUntil: null,
+    queuedAt: new Date(0),
+    startedAt: null,
+    finishedAt: null,
+  });
+
   return {
     runs,
     renewals,
 
     async insert(workspaceId, draft: RunDraft) {
-      const run: Run = {
-        id: draft.id,
-        workspaceId,
-        agentId: draft.agentId,
-        agentVersionId: draft.agentVersionId,
-        conversationId: draft.conversationId,
-        status: "queued",
-        input: draft.input,
-        output: null,
-        errorCode: null,
-        errorMessage: null,
-        turnsCompleted: 0,
-        checkpoint: null,
-        leaseUntil: null,
-        queuedAt: new Date(0),
-        startedAt: null,
-        finishedAt: null,
-      };
+      const run = buildRun({ ...draft, workspaceId });
+      runs.push(run);
+      return { ...run };
+    },
+
+    async insertWithinLimit(workspaceId, draft: RunDraft, maxSimultaneous) {
+      // Atomic by construction: the count and the push happen in one
+      // synchronous step, so a racing pair of calls cannot both pass. The
+      // Postgres adapter holds the same invariant with a per-workspace
+      // transaction lock (S10).
+      const unfinished = runs.filter(
+        (run) =>
+          run.workspaceId === workspaceId && !TERMINAL.includes(run.status),
+      ).length;
+      if (unfinished >= maxSimultaneous) return null;
+      const run = buildRun({ ...draft, workspaceId });
       runs.push(run);
       return { ...run };
     },
@@ -120,7 +140,10 @@ export function createInMemoryRunRepo(
 
     async finish(workspaceId, runId, outcome: RunOutcome) {
       const run = find(workspaceId, runId);
-      if (!run) return null;
+      // Conditional terminal write (S11): a row that already reads terminal
+      // is not overwritten by a later, different terminal state — the call
+      // changes nothing and answers `null`, so the caller can tell.
+      if (!run || TERMINAL.includes(run.status)) return null;
       run.status = outcome.status;
       run.output = "output" in outcome ? outcome.output : null;
       run.errorCode = "errorCode" in outcome ? outcome.errorCode : null;

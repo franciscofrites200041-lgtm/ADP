@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { RunCheckpoint } from "@middleware/contracts";
-import type { RunDraft } from "@middleware/core";
+import type { Run, RunDraft } from "@middleware/core";
 import { createId, schema } from "@middleware/db";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -181,6 +181,138 @@ describe.skipIf(!url)("run repo (postgres)", () => {
     expect(done?.errorCode).toBeNull();
   });
 
+  it("finish refuses to overwrite a terminal row with another terminal state (S11)", async () => {
+    const ws = workspace();
+    const run = await repo.insert(ws, await draft(ws));
+    const cancelled = await repo.finish(ws, run.id, {
+      status: "cancelled",
+      output: null,
+    });
+    expect(cancelled?.status).toBe("cancelled");
+
+    // A later, different terminal state changes nothing — and the caller
+    // can tell: the port answers null, not the row it refused to write.
+    const overwritten = await repo.finish(ws, run.id, {
+      status: "failed",
+      errorCode: "run_timeout",
+      errorMessage: "run_timeout",
+    });
+    expect(overwritten).toBeNull();
+
+    const row = await repo.findById(ws, run.id);
+    expect(row?.status).toBe("cancelled");
+    expect(row?.output).toBeNull();
+    expect(row?.errorCode).toBeNull();
+    expect(row?.errorMessage).toBeNull();
+    expect(row?.finishedAt).toEqual(cancelled?.finishedAt);
+  });
+
+  it("insertWithinLimit admits the 5th unfinished run and refuses the 6th (S10)", async () => {
+    const ws = workspace();
+    for (let i = 0; i < 4; i += 1) {
+      const run = await repo.insert(ws, await draft(ws));
+      await repo.claimLease(ws, run.id, new Date(Date.now() + 60_000));
+    }
+
+    const fifth = await repo.insertWithinLimit(ws, await draft(ws), 5);
+    expect(fifth?.status).toBe("queued");
+    expect(await repo.insertWithinLimit(ws, await draft(ws), 5)).toBeNull();
+
+    // A finished run no longer counts: its slot frees up.
+    await repo.finish(ws, fifth?.id ?? "", {
+      status: "succeeded",
+      output: "listo",
+    });
+    expect(await repo.insertWithinLimit(ws, await draft(ws), 5)).not.toBeNull();
+  });
+
+  it("insertWithinLimit: racing starts cannot all pass (S10)", async () => {
+    const ws = workspace();
+    for (let i = 0; i < 4; i += 1) {
+      const run = await repo.insert(ws, await draft(ws));
+      await repo.claimLease(ws, run.id, new Date(Date.now() + 60_000));
+    }
+    // One slot left, several concurrent contenders: every racing pair among
+    // them must not both pass. Without the per-workspace lock, two counts
+    // could both see room under READ COMMITTED and both insert.
+    const contenders = await Promise.all(
+      Array.from({ length: 8 }, () => draft(ws)),
+    );
+    const outcomes = await Promise.all(
+      contenders.map((candidate) => repo.insertWithinLimit(ws, candidate, 5)),
+    );
+
+    const winners = outcomes.filter((run) => run !== null);
+    expect(winners).toHaveLength(1);
+    expect(winners[0]?.status).toBe("queued");
+    const [counted] = await sql`select count(*)::int as total from run
+        where workspace_id = ${ws}`;
+    expect(counted?.total).toBe(5);
+  });
+
+  it("insertWithinLimit waits for the workspace lock before counting (S10)", async () => {
+    // The racing test above is a smoke: it can pass by luck, because two
+    // fast transactions may never overlap. This one is deterministic — it
+    // holds the per-workspace advisory lock on another connection, so the
+    // cap check cannot run until that lock is released. Without the lock the
+    // insert goes straight through and the race below answers `inserted`.
+    const ws = workspace();
+    const candidate = await draft(ws);
+    const blocker = postgres(url ?? "", { max: 1 });
+    let pending: Promise<unknown> | undefined;
+    try {
+      await blocker.begin(async (tx) => {
+        await tx`select pg_advisory_xact_lock(hashtext(${ws}))`;
+        pending = repo.insertWithinLimit(ws, candidate, 5);
+        const raced = await Promise.race([
+          pending.then(() => "inserted" as const),
+          new Promise<"blocked">((resolve) =>
+            setTimeout(() => resolve("blocked"), 400),
+          ),
+        ]);
+        expect(raced).toBe("blocked");
+      });
+    } finally {
+      await blocker.end();
+    }
+    // The lock only serializes: once released, the same start completes.
+    expect(await pending).not.toBeNull();
+  });
+
+  it("one holder claims a live lease even when two connections race (§5)", async () => {
+    const ws = workspace();
+    // Two separate sessions: a shared pool could serialize the claims and
+    // hide a read-then-write race.
+    const sqlA = postgres(url ?? "", { max: 1 });
+    const sqlB = postgres(url ?? "", { max: 1 });
+    try {
+      const repoA = createRunRepo(drizzle(sqlA, { schema }));
+      const repoB = createRunRepo(drizzle(sqlB, { schema }));
+      const runs: Run[] = [];
+      for (let i = 0; i < 10; i += 1) {
+        runs.push(await repo.insert(ws, await draft(ws)));
+      }
+      const soon = new Date(Date.now() + 60_000);
+
+      const claims = await Promise.all(
+        runs.flatMap((run) => [
+          repoA.claimLease(ws, run.id, soon),
+          repoB.claimLease(ws, run.id, soon),
+        ]),
+      );
+
+      // Exactly one winner per run: a SELECT-then-UPDATE implementation
+      // that reads the lease outside the row-locking UPDATE would let both
+      // connections claim the same run.
+      expect(claims.filter(Boolean)).toHaveLength(runs.length);
+      const live = await repo.findById(ws, runs[0]?.id ?? "");
+      expect(live?.status).toBe("running");
+    } finally {
+      await sqlA.end();
+      await sqlB.end();
+    }
+  });
+
   it("sweep listExpiredLeases returns only expired running runs, as id pairs", async () => {
     const sweeper = createRunSweeper(drizzle(sql, { schema }));
     const ws = workspace();
@@ -322,5 +454,21 @@ describe.skipIf(!url)("run repo (postgres)", () => {
       (await repo.listByWorkspace(ws, { status: "failed" })).map((r) => r.id),
     ).toEqual([failed.id]);
     expect(await repo.listByWorkspace(other, {})).toHaveLength(1);
+  });
+
+  it("listByWorkspace filters by agent in the query, not after the page", async () => {
+    const ws = workspace();
+    const wanted = await repo.insert(ws, await draft(ws));
+    // Newer, so it is the only row a `limit: 1` page would contain. If the
+    // filter ran after the page cut, asking for `wanted.agentId` would come
+    // back empty and older runs would vanish behind other agents' rows.
+    const newer = await repo.insert(ws, await draft(ws));
+    expect(newer.agentId).not.toBe(wanted.agentId);
+
+    const filtered = await repo.listByWorkspace(ws, {
+      agentId: wanted.agentId,
+      limit: 1,
+    });
+    expect(filtered.map((r) => r.id)).toEqual([wanted.id]);
   });
 });

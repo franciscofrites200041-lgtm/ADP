@@ -7,6 +7,9 @@ const appDir = fileURLToPath(new URL("..", import.meta.url));
 const providerKey = `sk-${randomBytes(16).toString("hex")}`;
 
 describe("api entrypoint", () => {
+  // The entrypoint now composes the run engine, so the child process takes
+  // longer to transform than the 5s default allows on a loaded machine. The
+  // assertions are unchanged: only the budget for the spawn is explicit.
   it("refuses to start with a provider key in the environment", () => {
     // Otherwise valid: without the guard the server would start and hang.
     const result = spawnSync(process.execPath, ["src/index.ts"], {
@@ -32,5 +35,5 @@ describe("api entrypoint", () => {
     expect(output).toContain("OPENAI_API_KEY");
     expect(output).not.toContain(providerKey);
     expect(output).not.toContain("[api] listening");
-  });
+  }, 60_000);
 });

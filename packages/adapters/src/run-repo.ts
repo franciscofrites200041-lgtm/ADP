@@ -10,7 +10,7 @@ import type {
   SweptRun,
 } from "@middleware/core";
 import { type DbClient, schema } from "@middleware/db";
-import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lt, not, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { InvariantError } from "./errors.ts";
@@ -23,6 +23,27 @@ const resumable = inArray(runTable.status, [
   "running",
   "waiting_approval",
 ]);
+
+/** A terminal row is closed: no later terminal state overwrites it (S11). */
+const terminal = inArray(runTable.status, ["succeeded", "failed", "cancelled"]);
+
+/** What counts against the §10 cap (S10): everything not yet terminal. */
+const unfinished = not(terminal);
+
+/** The column values of a new root run (shared by both insert paths). */
+const runValues = (workspaceId: string, draft: RunDraft) => ({
+  id: draft.id,
+  workspaceId,
+  agentId: draft.agentId,
+  agentVersionId: draft.agentVersionId,
+  conversationId: draft.conversationId,
+  trigger: draft.trigger,
+  // A root run points at itself; delegation children (WP-55) will point at
+  // their parent once the engine creates them.
+  rootRunId: draft.id,
+  input: draft.input,
+  status: "queued" as const,
+});
 
 /**
  * `input`, `output` and `checkpoint` are jsonb at the driver but typed in the
@@ -77,19 +98,7 @@ export function createRunRepo(db: DbClient): RunRepo {
     async insert(workspaceId, draft: RunDraft) {
       const [row] = await db
         .insert(runTable)
-        .values({
-          id: draft.id,
-          workspaceId,
-          agentId: draft.agentId,
-          agentVersionId: draft.agentVersionId,
-          conversationId: draft.conversationId,
-          trigger: draft.trigger,
-          // A root run points at itself; delegation children (WP-55) will
-          // point at their parent once the engine creates them.
-          rootRunId: draft.id,
-          input: draft.input,
-          status: "queued",
-        })
+        .values(runValues(workspaceId, draft))
         .returning();
       // Safe: an INSERT … RETURNING without ON CONFLICT yields exactly one
       // row; anything else is a broken invariant, not a user outcome.
@@ -100,6 +109,34 @@ export function createRunRepo(db: DbClient): RunRepo {
         );
       }
       return toRun(row);
+    },
+
+    async insertWithinLimit(workspaceId, draft: RunDraft, maxSimultaneous) {
+      return await db.transaction(async (tx) => {
+        // One per-workspace lock serializes the cap check with the insert,
+        // the same pattern the event store applies per run (S10): without
+        // it, two racing counts could both see room under READ COMMITTED
+        // and both insert.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${workspaceId}))`,
+        );
+        const [counted] = await tx
+          .select({ total: count() })
+          .from(runTable)
+          .where(and(eq(runTable.workspaceId, workspaceId), unfinished));
+        if ((counted?.total ?? 0) >= maxSimultaneous) return null;
+        const [row] = await tx
+          .insert(runTable)
+          .values(runValues(workspaceId, draft))
+          .returning();
+        if (!row) {
+          throw new InvariantError(
+            "run_insert_no_row",
+            "run insert returned no row",
+          );
+        }
+        return toRun(row);
+      });
     },
 
     async findById(workspaceId, runId) {
@@ -184,7 +221,15 @@ export function createRunRepo(db: DbClient): RunRepo {
           leaseUntil: null,
         })
         .where(
-          and(eq(runTable.workspaceId, workspaceId), eq(runTable.id, runId)),
+          and(
+            eq(runTable.workspaceId, workspaceId),
+            eq(runTable.id, runId),
+            // Conditional (S11): a row that already reads terminal is
+            // never overwritten by a later, different terminal state —
+            // the call changes nothing and answers no row, so the caller
+            // can tell.
+            not(terminal),
+          ),
         )
         .returning();
       return row ? toRun(row) : null;
@@ -193,6 +238,7 @@ export function createRunRepo(db: DbClient): RunRepo {
     async listByWorkspace(workspaceId, filter: RunListFilter) {
       const conditions = [eq(runTable.workspaceId, workspaceId)];
       if (filter.status) conditions.push(eq(runTable.status, filter.status));
+      if (filter.agentId) conditions.push(eq(runTable.agentId, filter.agentId));
       const rows = await db
         .select()
         .from(runTable)
