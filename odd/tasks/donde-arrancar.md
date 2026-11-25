@@ -1,9 +1,18 @@
 # Dónde arrancar
 
-Estado al **2026-11-25**, `main` en `dac1a0a`. El MVP de la Demo 1 está completo y
-usable: te registrás, cargás una key, creás un agente desde una plantilla y
-chateás viendo la respuesta llegar — y podés recargar a mitad de la respuesta sin
-perder texto.
+> **El repo se mudó fuera de OneDrive.** Vive en `C:\dev\middleware-adp`. OneDrive
+> corrompió `.git` tres veces: no es mala suerte, es un editor de archivos
+> sincronizando un repo. La ruta vieja (`C:\Users\franc\OneDrive\Escritorio\
+> Middleware ADP`) queda sólo como respaldo hasta que se borre.
+>
+> Si `git status` alguna vez muestra `Error building trees` o un objeto inválido,
+> sospechá de la sincronización antes que de git.
+
+Estado al **2026-11-25**, `main` en `fdcf576`, CI entero en verde (incluido el
+navegador y `knip`). El MVP de la Demo 1 está completo y usable: te registrás,
+cargás una key, creás un agente desde una plantilla y chateás viendo la respuesta
+llegar — y podés recargar a mitad de la respuesta sin perder texto. La Demo 2 está
+pleneada en `odd/tasks/demo-2.md`, tarea por tarea.
 
 ## Lo que está hecho
 
@@ -73,3 +82,21 @@ git commit -m "..." -- <rutas>   # rutas también al final, sin excepción
 - **Q7**: las 6 plantillas. Las instrucciones actuales las escribió el agente: son
   usables, no definitivas.
 - Desconectar Vercel (no aplica por ADR-0003).
+
+## Correr los tests en esta máquina
+
+`pnpm test` lanza las suites de todos los paquetes en paralelo y **se queda sin
+memoria** (16 GB, 4 libres): los workers de vitest abortan con exit 134 y dejan
+errores que mienten — «Invalid package config», por ejemplo, sobre un archivo que
+es JSON válido. Cuando veas 134, `signal: aborted` o «heap out of memory», liberá
+memoria y volvé a correr; no leas el error de arriba como diagnóstico.
+
+Lo que funciona:
+
+```bash
+export DATABASE_URL_TEST="postgres://mw_test@127.0.0.1:55432/middleware_test"
+pnpm turbo run test --concurrency=1                      # paquete por paquete
+cd packages/adapters && npx vitest run --no-file-parallelism   # 183 tests, 21 s
+```
+
+En CI no hace falta: el runner tiene su cuota y turbo arranca con otro perfil.
