@@ -37,7 +37,7 @@ export function replaceLiveText(
   return next;
 }
 
-export type LivePhase = "connecting" | "streaming" | "failed" | "cancelled";
+type LivePhase = "connecting" | "streaming" | "failed" | "cancelled";
 
 type ChatTranscriptProps = {
   history: MessageResponse[];

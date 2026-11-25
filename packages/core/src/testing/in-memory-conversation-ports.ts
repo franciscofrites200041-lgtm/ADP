@@ -55,7 +55,7 @@ const decodeMessageCursor = (cursor: string): MessageCursorAnchor => {
 };
 
 /** In-memory conversation store honouring `ConversationRepo` (§7). */
-export function createInMemoryConversationRepo(): ConversationRepo & {
+function createInMemoryConversationRepo(): ConversationRepo & {
   rows: Conversation[];
 } {
   const rows: Conversation[] = [];
@@ -124,7 +124,7 @@ export function createInMemoryConversationRepo(): ConversationRepo & {
  * conversation that is not in the workspace instead of seeding an orphan
  * row; the Postgres adapter also validates the run through its FK.
  */
-export function createInMemoryMessageRepo(
+function createInMemoryMessageRepo(
   conversations: ConversationRepo,
 ): MessageRepo & { rows: Message[] } {
   const rows: Message[] = [];
