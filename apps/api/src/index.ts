@@ -15,6 +15,7 @@ import {
   createAgentService,
   createCredentialService,
   createModelService,
+  createRunService,
 } from "@middleware/core";
 import { createDbClient, ping } from "@middleware/db";
 
@@ -82,6 +83,27 @@ const agents = createAgentService({
   clock: createSystemClock(),
   idGen: createUuidV7IdGen(),
 });
+// The chat engine (T1–T5): the run repos, the event store and the bus come
+// from the container, over the same pool the container closes on shutdown.
+const idGen = createUuidV7IdGen();
+const runs = createRunService({
+  agentRepo: createAgentRepo(dbClient),
+  credentialRepo: createCredentialRepo(dbClient),
+  conversationRepo: container.conversationRepo,
+  messageRepo: container.messageRepo,
+  runRepo: container.runRepo,
+  runEventStore: container.runEventStore,
+  liveEventBus: container.liveEventBus,
+  backgroundTasks: container.backgroundTasks,
+  agentRuntime: container.agentRuntime,
+  secretVault: createCredentialSecretVault(
+    container.sql,
+    container.workspaceKeys,
+  ),
+  usageRepo: container.usageRepo,
+  clock: createSystemClock(),
+  idGen,
+});
 const logger = createLogger();
 const app = createApp({
   ready: () => ping(dbClient),
@@ -89,6 +111,17 @@ const app = createApp({
   credentials,
   models,
   agents,
+  runs: {
+    service: runs,
+    runRepo: container.runRepo,
+    eventStore: container.runEventStore,
+    liveBus: container.liveEventBus,
+  },
+  conversations: {
+    conversations: container.conversationRepo,
+    messages: container.messageRepo,
+    idGen,
+  },
   allowedOrigins: [BETTER_AUTH_URL],
   logger,
 });
@@ -100,6 +133,10 @@ const server = serve({ fetch: app.fetch, port }, () => {
 registerShutdown({
   server,
   close: async () => {
+    // Runs outlive their requests (S2): let them settle before the pools
+    // close. A run still going after the grace is abandoned, like the
+    // server itself.
+    await container.backgroundTasks.drain(MW_SHUTDOWN_GRACE_SECONDS * 1000);
     await container.close();
     await dbClient.$client.end();
   },

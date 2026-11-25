@@ -7,10 +7,14 @@ import { Hono } from "hono";
 import type { Logger } from "pino";
 import { agentRoutes } from "./agent-routes.ts";
 import type { Auth } from "./auth.ts";
+import type { ConversationRoutesDeps } from "./conversation-routes.ts";
+import { conversationRoutes } from "./conversation-routes.ts";
 import { credentialRoutes } from "./credentials-routes.ts";
 import { createErrorHandler } from "./http-errors.ts";
 import { createLogger } from "./logger.ts";
 import { meRoutes } from "./me.ts";
+import type { RunRoutesDeps } from "./run-routes.ts";
+import { runRoutes } from "./run-routes.ts";
 
 /** Injected asynchronous PostgreSQL readiness check. */
 export type ReadinessChecker = () => Promise<boolean>;
@@ -25,6 +29,10 @@ export interface CreateAppOptions {
   models?: ModelService;
   /** Agent CRUD and versions (WP-20); mounted with `auth`. */
   agents?: AgentService;
+  /** Run surface with its SSE streams (T6, T7); mounted with `auth`. */
+  runs?: RunRoutesDeps;
+  /** Conversations and paginated history (T7, S11); mounted with `auth`. */
+  conversations?: ConversationRoutesDeps;
   /** Origins allowed to write; defaults to none, which rejects every write. */
   allowedOrigins?: readonly string[];
   logger?: Logger;
@@ -41,6 +49,8 @@ export function createApp({
   credentials,
   models,
   agents,
+  runs,
+  conversations,
   allowedOrigins = [],
   logger = createLogger(),
 }: CreateAppOptions): Hono {
@@ -71,6 +81,12 @@ export function createApp({
     }
     if (agents) {
       app.route("/", agentRoutes(auth, agents, allowedOrigins));
+    }
+    if (runs) {
+      app.route("/", runRoutes(auth, runs, allowedOrigins));
+    }
+    if (conversations) {
+      app.route("/", conversationRoutes(auth, conversations, allowedOrigins));
     }
   }
 

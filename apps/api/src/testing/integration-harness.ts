@@ -10,55 +10,33 @@ import {
   createPiModelGateway,
   createSystemClock,
   createUuidV7IdGen,
+  // The disposable-database guard is shared, not copied (ADR-0006): every
+  // Postgres-backed suite resolves its URL through the same function.
+  testDatabaseUrl,
 } from "@middleware/adapters";
 import {
+  type AgentRuntime,
   type CredentialProbe,
   createAgentService,
   createCredentialService,
   createModelService,
+  createRunService,
   type IdGen,
 } from "@middleware/core";
 import { createDbClient, runMigrations } from "@middleware/db";
 import type { Logger } from "pino";
-import { z } from "zod";
 
 import { createApp } from "../app.ts";
 import { type Auth, createAuth } from "../auth.ts";
 import { createLogger } from "../logger.ts";
 
-class UnsafeTestDatabaseError extends Error {
-  readonly code = "UNSAFE_TEST_DATABASE";
-}
-
 class TestSessionError extends Error {
   readonly code = "TEST_SESSION_FAILED";
 }
 
-/**
- * Opt-in: `DATABASE_URL_TEST`, and only the disposable database. Validated at
- * the boundary like every other environment input (Zod), so a missing or unsafe
- * value is one decision in one place.
- */
-const testDatabaseUrlSchema = z.url({ protocol: /^postgres(ql)?$/ }).refine(
-  (value) => {
-    const parsed = new URL(value);
-    const isLoopback = parsed.hostname === "127.0.0.1";
-    return isLoopback && parsed.pathname === "/middleware_test";
-  },
-  { message: "Refusing to run against a non-disposable database" },
-);
-
-export function testDatabaseUrl(): string | undefined {
-  const raw = process.env.DATABASE_URL_TEST;
-  if (raw === undefined || raw.trim() === "") return undefined;
-  const parsed = testDatabaseUrlSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new UnsafeTestDatabaseError(
-      "Refusing to run against a non-disposable database",
-    );
-  }
-  return parsed.data;
-}
+// Re-exported so every suite of this app keeps importing it from one place;
+// the skip-or-fail-loudly rule lives in the shared guard, not here.
+export { testDatabaseUrl };
 
 /** The web origin the harness impersonates; requests must send it (S10). */
 export const TEST_ORIGIN = "http://localhost:3001";
@@ -81,6 +59,7 @@ async function composeApp(
       return { status: "invalid", code: "provider_error" };
     },
   },
+  agentRuntime?: AgentRuntime,
 ) {
   await runMigrations(url);
   const container = await createContainer({
@@ -134,12 +113,44 @@ async function composeApp(
     clock: createSystemClock(),
     idGen,
   });
+  // The chat engine (T1–T5) composed like `index.ts`: real repos over the
+  // disposable database, with the runtime injectable so a suite can swap in
+  // the faux provider and never reach a real one (§14).
+  const runs = createRunService({
+    agentRepo: createAgentRepo(db),
+    credentialRepo: createCredentialRepo(db),
+    conversationRepo: container.conversationRepo,
+    messageRepo: container.messageRepo,
+    runRepo: container.runRepo,
+    runEventStore: container.runEventStore,
+    liveEventBus: container.liveEventBus,
+    backgroundTasks: container.backgroundTasks,
+    agentRuntime: agentRuntime ?? container.agentRuntime,
+    secretVault: createCredentialSecretVault(
+      container.sql,
+      container.workspaceKeys,
+    ),
+    usageRepo: container.usageRepo,
+    clock: createSystemClock(),
+    idGen,
+  });
   const app = createApp({
     ready: async () => true,
     auth,
     credentials,
     models,
     agents,
+    runs: {
+      service: runs,
+      runRepo: container.runRepo,
+      eventStore: container.runEventStore,
+      liveBus: container.liveEventBus,
+    },
+    conversations: {
+      conversations: container.conversationRepo,
+      messages: container.messageRepo,
+      idGen,
+    },
     allowedOrigins: [TEST_ORIGIN],
     logger,
   });
@@ -147,7 +158,13 @@ async function composeApp(
     await db.$client.end();
     await container.close();
   };
-  return { app, auth, sql: container.sql, close };
+  return {
+    app,
+    auth,
+    sql: container.sql,
+    backgroundTasks: container.backgroundTasks,
+    close,
+  };
 }
 
 /** The postgres.js client composed above, without importing its types. */
@@ -188,13 +205,15 @@ export async function createIntegrationHarness(
   logger: Logger = createLogger(),
   idGen: IdGen = createUuidV7IdGen(),
   credentialProbe?: CredentialProbe,
+  agentRuntime?: AgentRuntime,
 ) {
   const {
     app,
     auth,
     sql,
+    backgroundTasks,
     close: end,
-  } = await composeApp(url, logger, idGen, credentialProbe);
+  } = await composeApp(url, logger, idGen, credentialProbe, agentRuntime);
   const emails: string[] = [];
   const workspaceIds: string[] = [];
 
@@ -207,6 +226,8 @@ export async function createIntegrationHarness(
   }
 
   async function close() {
+    // Runs outlive their requests: drain them before tearing rows down (S2).
+    await backgroundTasks.drain(15_000);
     for (const id of workspaceIds) {
       // Children first: run rows carry FKs to agent, agent_version and the
       // tables below, so the run family goes before the agent family.
@@ -237,5 +258,12 @@ export async function createIntegrationHarness(
     await end();
   }
 
-  return { app, sql, signUp, close };
+  return {
+    app,
+    sql,
+    signUp,
+    /** Resolves once every tracked run settled (or the timeout passed). */
+    drain: () => backgroundTasks.drain(15_000),
+    close,
+  };
 }

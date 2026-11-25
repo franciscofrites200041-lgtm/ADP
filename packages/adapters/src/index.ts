@@ -19,6 +19,7 @@ export * from "./run-event-store.ts";
 export * from "./run-repo.ts";
 export * from "./safe-fetch.ts";
 export * from "./system-ports.ts";
+export * from "./testing/test-database-url.ts";
 export * from "./url-guard.ts";
 export * from "./usage-repo.ts";
 export * from "./workspace-key-vault.ts";

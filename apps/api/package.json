@@ -24,6 +24,7 @@
     "zod": "4.6.6"
   },
   "devDependencies": {
+    "@earendil-works/pi-ai": "1.1.0",
     "@types/node": "24.19.2",
     "@types/nodemailer": "^8.0.2"
   }
