@@ -87,7 +87,10 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL_TEST }}
           E2E_API_DATABASE_URL: ${{ env.DATABASE_URL_TEST }}
           BETTER_AUTH_SECRET: ci-only-secret-not-used-in-production-0000
-          BETTER_AUTH_URL: http://localhost:3001
+          # The public origin of the app, not the API's port: it is what the
+          # browser sends as Origin and what `requireOrigin` allows (as in
+          # infra/env.demo.example). With 3001 here every write answered 403.
+          BETTER_AUTH_URL: http://localhost:3000
           SMTP_URL: smtp://localhost:1025
           MAIL_FROM: Middleware <no-reply@localhost>
           MW_MASTER_KEY_VERSION: v1
